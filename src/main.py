@@ -10,10 +10,20 @@ Current step:
 - Apply the rule-based UEBA risk engine
 - Apply Isolation Forest anomaly detection
 - Apply final risk analysis
-- Display final UEBA alerts
+- Export local results:
+    - data/processed/ueba_features.csv
+    - data/alerts/alerts.csv
 """
 
-from src.config import DEVICE_FILE, FILE_FILE, LOGON_FILE
+from src.config import (
+    ALERTS_FILE,
+    DEVICE_FILE,
+    FILE_FILE,
+    LOGON_FILE,
+    PROCESSED_DATA_DIR,
+    ALERTS_DATA_DIR,
+    UEBA_FEATURES_FILE,
+)
 from src.load_data import preview_csv
 from src.preprocessing import preprocess_log
 from src.feature_engineering import (
@@ -55,12 +65,18 @@ def build_sample_features(sample_size: int = 10000):
     return ueba_features
 
 
-def test_risk_analyzer(sample_size: int = 10000):
+def run_pipeline(sample_size: int = 10000):
     """
-    Test the full scoring pipeline:
-    features -> rules -> Isolation Forest -> final risk analysis.
+    Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
+
+    Steps:
+    1. Build behavioral features
+    2. Apply rule-based scoring
+    3. Apply Isolation Forest
+    4. Apply final risk analysis
+    5. Export features and alerts locally
     """
-    print("UEBA project - Final risk analyzer test")
+    print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
 
     ueba_features = build_sample_features(sample_size=sample_size)
@@ -75,25 +91,37 @@ def test_risk_analyzer(sample_size: int = 10000):
     )
 
     print("\nApplying final risk analysis...")
-    final_alerts = apply_risk_analysis(ml_scored_features)
+    final_results = apply_risk_analysis(ml_scored_features)
 
-    print("\nFinal alerts shape:")
-    print(final_alerts.shape)
+    print("\nFiltering alerts with risk_score > 0...")
+    alerts = final_results[final_results["risk_score"] > 0].copy()
+
+    print("\nCreating output directories if needed...")
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    ALERTS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("\nExporting UEBA features...")
+    final_results.to_csv(UEBA_FEATURES_FILE, index=False)
+
+    print("\nExporting UEBA alerts...")
+    alerts.to_csv(ALERTS_FILE, index=False)
+
+    print("\nExport completed successfully.")
+    print(f"Features saved to: {UEBA_FEATURES_FILE}")
+    print(f"Alerts saved to: {ALERTS_FILE}")
+
+    print("\nFinal results shape:")
+    print(final_results.shape)
+
+    print("\nAlerts shape:")
+    print(alerts.shape)
 
     print("\nRisk level distribution:")
-    print(final_alerts["risk_level"].value_counts())
+    print(final_results["risk_level"].value_counts())
 
-    print("\nRisk score statistics:")
-    print(final_alerts["risk_score"].describe())
-
-    risky_alerts = final_alerts[final_alerts["risk_score"] > 0]
-
-    print("\nNumber of alerts with risk_score > 0:")
-    print(len(risky_alerts))
-
-    print("\nTop critical alerts:")
+    print("\nTop alerts:")
     print(
-        risky_alerts.sort_values("risk_score", ascending=False)
+        alerts.sort_values("risk_score", ascending=False)
         [
             [
                 "user",
@@ -104,12 +132,6 @@ def test_risk_analyzer(sample_size: int = 10000):
                 "rule_score",
                 "is_anomaly",
                 "anomaly_score",
-                "logon_outside_hours",
-                "usb_events",
-                "usb_outside_hours",
-                "file_copy_events",
-                "file_copy_outside_hours",
-                "unique_logon_pcs",
             ]
         ]
         .head(10)
@@ -120,7 +142,7 @@ def main():
     """
     Run the current UEBA pipeline step.
     """
-    test_risk_analyzer(sample_size=10000)
+    run_pipeline(sample_size=10000)
 
 
 if __name__ == "__main__":
