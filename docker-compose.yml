@@ -1,14 +1,41 @@
 # docker-compose.yml
 #
-# This file will be used to run the services required for the UEBA dashboard:
+# This file runs the services required for the UEBA dashboard:
 # - Elasticsearch: stores UEBA alerts and analysis results
 # - Grafana: visualizes alerts, risk scores, and suspicious behaviors
-#
-# The complete configuration will be added in a later step.
-
-version: "3.8"
 
 services:
-  # Elasticsearch service will be configured later.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: ueba_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - ueba_es_data:/usr/share/elasticsearch/data
+    networks:
+      - ueba_network
 
-  # Grafana service will be configured later.
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ueba_grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ueba_grafana_data:/var/lib/grafana
+    networks:
+      - ueba_network
+
+volumes:
+  ueba_es_data:
+  ueba_grafana_data:
+
+networks:
+  ueba_network:
+    driver: bridge
