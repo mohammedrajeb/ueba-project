@@ -4,60 +4,81 @@ main.py
 Main entry point of the UEBA project.
 
 Current step:
-- Inspect CERT r4.2 logs
-- Load small samples from logon.csv, device.csv and file.csv
+- Load samples from CERT r4.2 logs
 - Apply preprocessing
-- Verify generated time-based features
+- Build behavioral features by user and day
+- Display the generated UEBA feature table
+
+This step validates the feature engineering logic before processing
+larger parts of the dataset.
 """
 
 from src.config import DEVICE_FILE, FILE_FILE, LOGON_FILE
-from src.load_data import inspect_csv, preview_csv
+from src.load_data import preview_csv
 from src.preprocessing import preprocess_log
+from src.feature_engineering import (
+    build_device_features,
+    build_file_features,
+    build_logon_features,
+    merge_behavioral_features,
+)
 
 
-def inspect_raw_logs():
+def test_feature_engineering(sample_size: int = 10000):
     """
-    Inspect raw CERT r4.2 log files.
+    Test feature engineering on log samples.
+
+    A sample is used first to avoid loading very large files during testing.
     """
-    print("UEBA project - CERT r4.2 raw log inspection")
+    print("UEBA project - Feature engineering test")
+    print(f"Sample size per file: {sample_size}")
 
-    inspect_csv(LOGON_FILE, "logon.csv")
-    inspect_csv(DEVICE_FILE, "device.csv")
-    inspect_csv(FILE_FILE, "file.csv")
+    print("\nLoading samples...")
+    logon_sample = preview_csv(LOGON_FILE, nrows=sample_size)
+    device_sample = preview_csv(DEVICE_FILE, nrows=sample_size)
+    file_sample = preview_csv(FILE_FILE, nrows=sample_size)
 
-
-def test_preprocessing():
-    """
-    Test preprocessing on small samples of the three main logs.
-    """
-    print("\n" + "#" * 80)
-    print("Testing preprocessing on log samples")
-    print("#" * 80)
-
-    logon_sample = preview_csv(LOGON_FILE, nrows=5)
-    device_sample = preview_csv(DEVICE_FILE, nrows=5)
-    file_sample = preview_csv(FILE_FILE, nrows=5)
-
+    print("Preprocessing samples...")
     logon_processed = preprocess_log(logon_sample)
     device_processed = preprocess_log(device_sample)
     file_processed = preprocess_log(file_sample)
 
-    print("\nProcessed logon sample:")
-    print(logon_processed[["date", "day", "hour", "month", "weekday", "is_weekend", "outside_working_hours"]])
+    print("Building behavioral features...")
+    logon_features = build_logon_features(logon_processed)
+    device_features = build_device_features(device_processed)
+    file_features = build_file_features(file_processed)
 
-    print("\nProcessed device sample:")
-    print(device_processed[["date", "day", "hour", "month", "weekday", "is_weekend", "outside_working_hours"]])
+    print("\nLogon features preview:")
+    print(logon_features.head())
 
-    print("\nProcessed file sample:")
-    print(file_processed[["date", "day", "hour", "month", "weekday", "is_weekend", "outside_working_hours"]])
+    print("\nDevice features preview:")
+    print(device_features.head())
+
+    print("\nFile copy features preview:")
+    print(file_features.head())
+
+    print("\nMerging all behavioral features...")
+    ueba_features = merge_behavioral_features(
+        logon_features,
+        device_features,
+        file_features
+    )
+
+    print("\nFinal UEBA features shape:")
+    print(ueba_features.shape)
+
+    print("\nFinal UEBA features preview:")
+    print(ueba_features.head())
+
+    print("\nFinal UEBA feature columns:")
+    print(list(ueba_features.columns))
 
 
 def main():
     """
     Run the current UEBA pipeline step.
     """
-    inspect_raw_logs()
-    test_preprocessing()
+    test_feature_engineering(sample_size=10000)
 
 
 if __name__ == "__main__":

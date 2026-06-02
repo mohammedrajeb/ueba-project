@@ -1,26 +1,38 @@
 """
 feature_engineering.py
 
-This file builds behavioral UEBA features from preprocessed logs.
+This file builds behavioral UEBA features from preprocessed CERT r4.2 logs.
 
-The features are aggregated by user and day, for example:
-- number of logon events per day
-- number of activities outside working hours
-- number of different PCs used
-- number of USB events
-- number of file events
-- number of unique files accessed
+The goal is to aggregate raw events by user and day.
 
-These features will be used by the anomaly detection model.
+Main feature groups:
+- Logon behavior
+- USB/device behavior
+- File copy behavior
+
+The resulting feature table will be used by:
+- the rule-based risk engine
+- the Isolation Forest anomaly detection model
 """
 
+import pandas as pd
 
-def build_logon_features(logon_df):
+
+def build_logon_features(logon_df: pd.DataFrame) -> pd.DataFrame:
     """
     Build daily logon features by user.
+
+    Features created:
+    - logon_events: number of Logon events
+    - logoff_events: number of Logoff events
+    - logon_outside_hours: number of logon/logoff events outside working hours
+    - unique_logon_pcs: number of different PCs used by the user
     """
-    features = logon_df.groupby(["user", "day"]).agg(
-        logon_events=("activity", "count"),
+    df = logon_df.copy()
+
+    features = df.groupby(["user", "day"]).agg(
+        logon_events=("activity", lambda x: (x == "Logon").sum()),
+        logoff_events=("activity", lambda x: (x == "Logoff").sum()),
         logon_outside_hours=("outside_working_hours", "sum"),
         unique_logon_pcs=("pc", "nunique"),
     ).reset_index()
@@ -28,12 +40,23 @@ def build_logon_features(logon_df):
     return features
 
 
-def build_device_features(device_df):
+def build_device_features(device_df: pd.DataFrame) -> pd.DataFrame:
     """
     Build daily USB/device features by user.
+
+    Features created:
+    - usb_events: total number of device events
+    - usb_connect_events: number of Connect events
+    - usb_disconnect_events: number of Disconnect events
+    - usb_outside_hours: number of USB events outside working hours
+    - unique_usb_pcs: number of different PCs where USB activity occurred
     """
-    features = device_df.groupby(["user", "day"]).agg(
+    df = device_df.copy()
+
+    features = df.groupby(["user", "day"]).agg(
         usb_events=("activity", "count"),
+        usb_connect_events=("activity", lambda x: (x == "Connect").sum()),
+        usb_disconnect_events=("activity", lambda x: (x == "Disconnect").sum()),
         usb_outside_hours=("outside_working_hours", "sum"),
         unique_usb_pcs=("pc", "nunique"),
     ).reset_index()
@@ -41,22 +64,45 @@ def build_device_features(device_df):
     return features
 
 
-def build_file_features(file_df):
+def build_file_features(file_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build daily file activity features by user.
+    Build daily file copy features by user.
+
+    In CERT r4.2, each row in file.csv represents a file copy
+    to a removable media device.
+
+    Features created:
+    - file_copy_events: total number of copied files
+    - file_copy_outside_hours: number of file copies outside working hours
+    - unique_files_copied: number of unique filenames copied
+    - unique_file_pcs: number of different PCs used for file copies
     """
-    features = file_df.groupby(["user", "day"]).agg(
-        file_events=("activity", "count"),
-        file_outside_hours=("outside_working_hours", "sum"),
-        unique_files=("filename", "nunique"),
+    df = file_df.copy()
+
+    features = df.groupby(["user", "day"]).agg(
+        file_copy_events=("filename", "count"),
+        file_copy_outside_hours=("outside_working_hours", "sum"),
+        unique_files_copied=("filename", "nunique"),
+        unique_file_pcs=("pc", "nunique"),
     ).reset_index()
 
     return features
 
 
-def merge_features(logon_features, device_features, file_features):
+def merge_behavioral_features(
+    logon_features: pd.DataFrame,
+    device_features: pd.DataFrame,
+    file_features: pd.DataFrame
+) -> pd.DataFrame:
     """
-    Merge all behavioral features into one UEBA feature table.
+    Merge logon, device and file copy features into one UEBA feature table.
+
+    The merge is done using:
+    - user
+    - day
+
+    Missing values are replaced with 0 because absence of activity
+    means no event was recorded for that feature on that day.
     """
     features = logon_features.merge(
         device_features,
