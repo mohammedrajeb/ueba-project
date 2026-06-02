@@ -14,18 +14,20 @@ This script runs the complete UEBA pipeline:
 7. Apply Isolation Forest anomaly detection
 8. Optionally apply TensorFlow Autoencoder anomaly detection
 9. Apply final risk analysis
-10. Export local results:
+10. Optionally enrich results with LDAP context
+11. Export local results:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
-11. Optionally send alerts to Elasticsearch
+12. Optionally send alerts to Elasticsearch
 
 Examples:
     python -m src.main --sample-size 10000
     python -m src.main --sample-size 10000 --include-http
     python -m src.main --sample-size 10000 --include-email
-    python -m src.main --sample-size 10000 --include-http --include-email
-    python -m src.main --sample-size 10000 --include-http --include-email --use-autoencoder
-    python -m src.main --sample-size 10000 --include-http --include-email --use-autoencoder --send-to-elasticsearch
+    python -m src.main --sample-size 10000 --include-ldap
+    python -m src.main --sample-size 10000 --include-http --include-email --include-ldap
+    python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder
+    python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch
 """
 
 import argparse
@@ -37,11 +39,13 @@ from src.config import (
     EMAIL_FILE,
     FILE_FILE,
     HTTP_FILE,
+    LDAP_DIR,
     LOGON_FILE,
     PROCESSED_DATA_DIR,
     UEBA_FEATURES_FILE,
 )
 from src.autoencoder_model import apply_autoencoder
+from src.context_enrichment import enrich_with_ldap_context
 from src.elastic_connector import send_alerts_to_elasticsearch
 from src.feature_engineering import (
     build_device_features,
@@ -134,20 +138,10 @@ def run_pipeline(
     use_autoencoder: bool = False,
     include_http: bool = False,
     include_email: bool = False,
+    include_ldap: bool = False,
 ):
     """
     Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
-
-    Steps:
-    1. Build behavioral features
-    2. Optionally include HTTP behavior features
-    3. Optionally include email behavior features
-    4. Apply rule-based scoring
-    5. Apply Isolation Forest
-    6. Optionally apply TensorFlow Autoencoder
-    7. Apply final risk analysis
-    8. Export features and alerts locally
-    9. Optionally send alerts to Elasticsearch
 
     Parameters:
         sample_size: number of rows loaded from each raw log file
@@ -155,11 +149,13 @@ def run_pipeline(
         use_autoencoder: if True, apply TensorFlow Autoencoder anomaly detection
         include_http: if True, include HTTP/web behavior features
         include_email: if True, include email behavior features
+        include_ldap: if True, enrich final results with LDAP context
     """
     print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
     print(f"Include HTTP logs: {include_http}")
     print(f"Include Email logs: {include_email}")
+    print(f"Include LDAP context: {include_ldap}")
     print(f"Use TensorFlow Autoencoder: {use_autoencoder}")
     print(f"Send to Elasticsearch: {send_to_elasticsearch}")
 
@@ -195,6 +191,13 @@ def run_pipeline(
 
     print("\nApplying final risk analysis...")
     final_results = apply_risk_analysis(ml_scored_features)
+
+    if include_ldap:
+        print("\nEnriching results with LDAP context...")
+        final_results = enrich_with_ldap_context(
+            final_results,
+            ldap_dir=LDAP_DIR,
+        )
 
     print("\nFiltering alerts with risk_score > 0...")
     alerts = final_results[final_results["risk_score"] > 0].copy()
@@ -269,6 +272,20 @@ def run_pipeline(
             ]
         )
 
+    if include_ldap:
+        top_alert_columns.extend(
+            [
+                "employee_name",
+                "role",
+                "position",
+                "business_unit",
+                "functional_unit",
+                "department",
+                "team",
+                "supervisor",
+            ]
+        )
+
     existing_top_alert_columns = [
         column for column in top_alert_columns
         if column in alerts.columns
@@ -323,6 +340,12 @@ def parse_arguments():
         help="Include email behavior features from email.csv.",
     )
 
+    parser.add_argument(
+        "--include-ldap",
+        action="store_true",
+        help="Enrich UEBA results with LDAP organizational context.",
+    )
+
     return parser.parse_args()
 
 
@@ -338,6 +361,7 @@ def main():
         use_autoencoder=args.use_autoencoder,
         include_http=args.include_http,
         include_email=args.include_email,
+        include_ldap=args.include_ldap,
     )
 
 
