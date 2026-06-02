@@ -3,17 +3,25 @@ main.py
 
 Main entry point of the UEBA project.
 
-Current step:
-- Load samples from CERT r4.2 logs
-- Apply preprocessing
-- Build behavioral features by user and day
-- Apply the rule-based UEBA risk engine
-- Apply Isolation Forest anomaly detection
-- Apply final risk analysis
-- Export local results:
+This script runs the complete UEBA pipeline:
+
+1. Load samples from CERT r4.2 logs
+2. Apply preprocessing
+3. Build behavioral features by user and day
+4. Apply the rule-based UEBA risk engine
+5. Apply Isolation Forest anomaly detection
+6. Apply final risk analysis
+7. Export local results:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
+
+The sample size can be configured from the command line.
+
+Example:
+    python -m src.main --sample-size 10000
 """
+
+import argparse
 
 from src.config import (
     ALERTS_FILE,
@@ -138,11 +146,33 @@ def run_pipeline(sample_size: int = 10000):
     )
 
 
+def parse_arguments():
+    """
+    Parse command-line arguments for the UEBA pipeline.
+
+    Returns:
+        argparse.Namespace containing the selected options
+    """
+    parser = argparse.ArgumentParser(
+        description="Run the UEBA pipeline on CERT r4.2 logs."
+    )
+
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        default=10000,
+        help="Number of rows to load from each raw log file. Default: 10000."
+    )
+
+    return parser.parse_args()
+
+
 def main():
     """
-    Run the current UEBA pipeline step.
+    Run the UEBA pipeline with command-line parameters.
     """
-    run_pipeline(sample_size=10000)
+    args = parse_arguments()
+    run_pipeline(sample_size=args.sample_size)
 
 
 if __name__ == "__main__":
