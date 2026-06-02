@@ -9,7 +9,8 @@ Current step:
 - Build behavioral features by user and day
 - Apply the rule-based UEBA risk engine
 - Apply Isolation Forest anomaly detection
-- Display anomalies detected by the AI model
+- Apply final risk analysis
+- Display final UEBA alerts
 """
 
 from src.config import DEVICE_FILE, FILE_FILE, LOGON_FILE
@@ -23,6 +24,7 @@ from src.feature_engineering import (
 )
 from src.rule_engine import apply_rule_engine
 from src.isolation_forest_model import apply_isolation_forest
+from src.risk_analyzer import apply_risk_analysis
 
 
 def build_sample_features(sample_size: int = 10000):
@@ -53,50 +55,55 @@ def build_sample_features(sample_size: int = 10000):
     return ueba_features
 
 
-def test_isolation_forest(sample_size: int = 10000):
+def test_risk_analyzer(sample_size: int = 10000):
     """
-    Test the rule engine and Isolation Forest model on UEBA features.
+    Test the full scoring pipeline:
+    features -> rules -> Isolation Forest -> final risk analysis.
     """
-    print("UEBA project - Isolation Forest test")
+    print("UEBA project - Final risk analyzer test")
     print(f"Sample size per file: {sample_size}")
 
     ueba_features = build_sample_features(sample_size=sample_size)
 
     print("\nApplying rule engine...")
-    scored_features = apply_rule_engine(ueba_features)
+    rule_scored_features = apply_rule_engine(ueba_features)
 
     print("\nApplying Isolation Forest...")
     ml_scored_features, _, _ = apply_isolation_forest(
-        scored_features,
+        rule_scored_features,
         contamination=0.02
     )
 
-    print("\nFinal scored features shape:")
-    print(ml_scored_features.shape)
+    print("\nApplying final risk analysis...")
+    final_alerts = apply_risk_analysis(ml_scored_features)
 
-    print("\nAnomaly prediction distribution:")
-    print(ml_scored_features["anomaly_prediction"].value_counts())
+    print("\nFinal alerts shape:")
+    print(final_alerts.shape)
 
-    print("\nNumber of AI anomalies:")
-    print(ml_scored_features["is_anomaly"].sum())
+    print("\nRisk level distribution:")
+    print(final_alerts["risk_level"].value_counts())
 
-    print("\nAnomaly score statistics:")
-    print(ml_scored_features["anomaly_score"].describe())
+    print("\nRisk score statistics:")
+    print(final_alerts["risk_score"].describe())
 
-    anomalies = ml_scored_features[ml_scored_features["is_anomaly"] == 1]
+    risky_alerts = final_alerts[final_alerts["risk_score"] > 0]
 
-    print("\nTop AI anomalies:")
+    print("\nNumber of alerts with risk_score > 0:")
+    print(len(risky_alerts))
+
+    print("\nTop critical alerts:")
     print(
-        anomalies.sort_values("anomaly_score", ascending=True)
+        risky_alerts.sort_values("risk_score", ascending=False)
         [
             [
                 "user",
                 "day",
+                "risk_score",
+                "risk_level",
+                "alert_reason",
                 "rule_score",
-                "rule_reasons",
-                "anomaly_prediction",
-                "anomaly_score",
                 "is_anomaly",
+                "anomaly_score",
                 "logon_outside_hours",
                 "usb_events",
                 "usb_outside_hours",
@@ -113,7 +120,7 @@ def main():
     """
     Run the current UEBA pipeline step.
     """
-    test_isolation_forest(sample_size=10000)
+    test_risk_analyzer(sample_size=10000)
 
 
 if __name__ == "__main__":
