@@ -2,7 +2,7 @@
 
 > **Plateforme :** User and Entity Behavior Analytics  
 > **Dataset :** CERT Insider Threat r4.2  
-> **Stack :** Python · Elasticsearch · Grafana
+> **Stack :** Python · Elasticsearch · Grafana - TensorFlow
 
 ---
 
@@ -306,18 +306,7 @@ dashboards/grafana_dashboard.json
 
 ---
 
-## 14. Améliorations futures
-
-- [ ] Intégrer `http.csv` pour analyser les habitudes de navigation et les domaines visités
-- [ ] Intégrer `email.csv` pour analyser les volumes d'emails, pièces jointes et destinataires externes
-- [ ] Intégrer les données LDAP pour enrichir l'analyse avec le rôle et le département de l'utilisateur
-- [ ] Ajouter un modèle **Autoencoder** (TensorFlow) et comparer ses performances à Isolation Forest
-- [ ] Enrichir le dashboard Grafana : évolution temporelle, filtres par utilisateur/niveau de risque, vue détaillée par profil
-- [ ] Optimiser le pipeline pour traiter progressivement des volumes plus importants de logs
-
----
-
-## 15. Conclusion
+## 14. Conclusion
 
 Ce projet a permis de construire une plateforme UEBA complète et fonctionnelle.
 
@@ -326,5 +315,3 @@ Le moteur développé est capable de charger des logs, les prétraiter, construi
 Cette première version constitue une base solide pour un système UEBA plus avancé, qui pourra être enrichi avec des logs HTTP, emails, LDAP et des modèles IA supplémentaires.
 
 ---
-
-*Rapport généré dans le cadre du projet UEBA — EMSI 4CIR Anfa*
