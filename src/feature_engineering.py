@@ -9,10 +9,12 @@ Main feature groups:
 - Logon behavior
 - USB/device behavior
 - File copy behavior
+- HTTP/web behavior
 
 The resulting feature table will be used by:
 - the rule-based risk engine
 - the Isolation Forest anomaly detection model
+- the TensorFlow Autoencoder anomaly detection model
 """
 
 import pandas as pd
@@ -89,13 +91,63 @@ def build_file_features(file_df: pd.DataFrame) -> pd.DataFrame:
     return features
 
 
+def extract_domain(url: str) -> str:
+    """
+    Extract a simple domain from a URL.
+
+    This function keeps the implementation lightweight and avoids adding
+    external dependencies.
+
+    Example:
+        http://example.com/page -> example.com
+    """
+    if not isinstance(url, str):
+        return "unknown"
+
+    cleaned_url = url.replace("http://", "").replace("https://", "")
+    domain = cleaned_url.split("/")[0]
+
+    return domain if domain else "unknown"
+
+
+def build_http_features(http_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build daily HTTP behavior features by user.
+
+    Features created:
+    - http_events: total number of HTTP events
+    - http_outside_hours: number of HTTP events outside working hours
+    - unique_urls: number of unique visited URLs
+    - unique_domains: number of unique visited domains
+    - unique_http_pcs: number of PCs used for HTTP activity
+    """
+    df = http_df.copy()
+
+    if "url" not in df.columns:
+        raise KeyError("The HTTP log must contain a 'url' column.")
+
+    df["domain"] = df["url"].apply(extract_domain)
+
+    features = df.groupby(["user", "day"]).agg(
+        http_events=("url", "count"),
+        http_outside_hours=("outside_working_hours", "sum"),
+        unique_urls=("url", "nunique"),
+        unique_domains=("domain", "nunique"),
+        unique_http_pcs=("pc", "nunique"),
+    ).reset_index()
+
+    return features
+
+
 def merge_behavioral_features(
     logon_features: pd.DataFrame,
     device_features: pd.DataFrame,
-    file_features: pd.DataFrame
+    file_features: pd.DataFrame,
+    http_features: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
-    Merge logon, device and file copy features into one UEBA feature table.
+    Merge logon, device, file copy and optional HTTP features
+    into one UEBA feature table.
 
     The merge is done using:
     - user
@@ -107,14 +159,21 @@ def merge_behavioral_features(
     features = logon_features.merge(
         device_features,
         on=["user", "day"],
-        how="outer"
+        how="outer",
     )
 
     features = features.merge(
         file_features,
         on=["user", "day"],
-        how="outer"
+        how="outer",
     )
+
+    if http_features is not None:
+        features = features.merge(
+            http_features,
+            on=["user", "day"],
+            how="outer",
+        )
 
     features = features.fillna(0)
 
