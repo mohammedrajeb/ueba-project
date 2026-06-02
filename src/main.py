@@ -8,7 +8,8 @@ Current step:
 - Apply preprocessing
 - Build behavioral features by user and day
 - Apply the rule-based UEBA risk engine
-- Display risky behaviors detected by rules
+- Apply Isolation Forest anomaly detection
+- Display anomalies detected by the AI model
 """
 
 from src.config import DEVICE_FILE, FILE_FILE, LOGON_FILE
@@ -21,6 +22,7 @@ from src.feature_engineering import (
     merge_behavioral_features,
 )
 from src.rule_engine import apply_rule_engine
+from src.isolation_forest_model import apply_isolation_forest
 
 
 def build_sample_features(sample_size: int = 10000):
@@ -51,11 +53,11 @@ def build_sample_features(sample_size: int = 10000):
     return ueba_features
 
 
-def test_rule_engine(sample_size: int = 10000):
+def test_isolation_forest(sample_size: int = 10000):
     """
-    Test the rule-based UEBA scoring engine.
+    Test the rule engine and Isolation Forest model on UEBA features.
     """
-    print("UEBA project - Rule engine test")
+    print("UEBA project - Isolation Forest test")
     print(f"Sample size per file: {sample_size}")
 
     ueba_features = build_sample_features(sample_size=sample_size)
@@ -63,26 +65,38 @@ def test_rule_engine(sample_size: int = 10000):
     print("\nApplying rule engine...")
     scored_features = apply_rule_engine(ueba_features)
 
-    print("\nScored UEBA features shape:")
-    print(scored_features.shape)
+    print("\nApplying Isolation Forest...")
+    ml_scored_features, _, _ = apply_isolation_forest(
+        scored_features,
+        contamination=0.02
+    )
 
-    print("\nRule score distribution:")
-    print(scored_features["rule_score"].describe())
+    print("\nFinal scored features shape:")
+    print(ml_scored_features.shape)
 
-    risky_behaviors = scored_features[scored_features["rule_score"] > 0]
+    print("\nAnomaly prediction distribution:")
+    print(ml_scored_features["anomaly_prediction"].value_counts())
 
-    print("\nNumber of risky behaviors detected by rules:")
-    print(len(risky_behaviors))
+    print("\nNumber of AI anomalies:")
+    print(ml_scored_features["is_anomaly"].sum())
 
-    print("\nTop risky behaviors:")
+    print("\nAnomaly score statistics:")
+    print(ml_scored_features["anomaly_score"].describe())
+
+    anomalies = ml_scored_features[ml_scored_features["is_anomaly"] == 1]
+
+    print("\nTop AI anomalies:")
     print(
-        risky_behaviors.sort_values("rule_score", ascending=False)
+        anomalies.sort_values("anomaly_score", ascending=True)
         [
             [
                 "user",
                 "day",
                 "rule_score",
                 "rule_reasons",
+                "anomaly_prediction",
+                "anomaly_score",
+                "is_anomaly",
                 "logon_outside_hours",
                 "usb_events",
                 "usb_outside_hours",
@@ -99,7 +113,7 @@ def main():
     """
     Run the current UEBA pipeline step.
     """
-    test_rule_engine(sample_size=10000)
+    test_isolation_forest(sample_size=10000)
 
 
 if __name__ == "__main__":
