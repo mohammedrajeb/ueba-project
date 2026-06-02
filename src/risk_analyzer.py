@@ -1,7 +1,8 @@
 """
 risk_analyzer.py
 
-This file combines the rule-based score and the machine learning anomaly result.
+This file combines the rule-based score, the Isolation Forest anomaly result,
+and the TensorFlow Autoencoder anomaly result.
 
 It produces:
 - risk_score: final risk score between 0 and 100
@@ -34,11 +35,13 @@ def get_risk_level(score: float) -> str:
 
 def calculate_final_risk(row) -> float:
     """
-    Combine rule-based score and AI anomaly detection into a final risk score.
+    Combine rule-based score, Isolation Forest and Autoencoder results
+    into a final risk score.
 
     Logic:
     - Start from the rule_score
     - Add 40 points if Isolation Forest detects an anomaly
+    - Add 30 points if TensorFlow Autoencoder detects an anomaly
     - Limit the final score to 100
 
     Parameters:
@@ -51,6 +54,9 @@ def calculate_final_risk(row) -> float:
 
     if row.get("is_anomaly", 0) == 1:
         score += 40
+
+    if row.get("autoencoder_is_anomaly", 0) == 1:
+        score += 30
 
     return min(score, 100)
 
@@ -75,6 +81,9 @@ def build_alert_reason(row) -> str:
     if row.get("is_anomaly", 0) == 1:
         reasons.append("AI anomaly detected by Isolation Forest")
 
+    if row.get("autoencoder_is_anomaly", 0) == 1:
+        reasons.append("AI anomaly detected by TensorFlow Autoencoder")
+
     if not reasons:
         return "No suspicious behavior detected"
 
@@ -86,7 +95,7 @@ def apply_risk_analysis(df):
     Apply final risk scoring and generate risk levels.
 
     Parameters:
-        df: DataFrame containing rule and AI scores
+        df: DataFrame containing rule, Isolation Forest and Autoencoder scores
 
     Returns:
         DataFrame with risk_score, risk_level and alert_reason

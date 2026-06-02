@@ -10,45 +10,56 @@ This script runs the complete UEBA pipeline:
 3. Build behavioral features by user and day
 4. Apply the rule-based UEBA risk engine
 5. Apply Isolation Forest anomaly detection
-6. Apply final risk analysis
-7. Export local results:
+6. Optionally apply TensorFlow Autoencoder anomaly detection
+7. Apply final risk analysis
+8. Export local results:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
-8. Optionally send alerts to Elasticsearch
+9. Optionally send alerts to Elasticsearch
 
 Examples:
     python -m src.main --sample-size 10000
-    python -m src.main --sample-size 50000 --send-to-elasticsearch
+    python -m src.main --sample-size 50000
+    python -m src.main --sample-size 10000 --send-to-elasticsearch
+    python -m src.main --sample-size 10000 --use-autoencoder
+    python -m src.main --sample-size 10000 --use-autoencoder --send-to-elasticsearch
 """
 
 import argparse
 
 from src.config import (
+    ALERTS_DATA_DIR,
     ALERTS_FILE,
     DEVICE_FILE,
     FILE_FILE,
     LOGON_FILE,
     PROCESSED_DATA_DIR,
-    ALERTS_DATA_DIR,
     UEBA_FEATURES_FILE,
 )
-from src.load_data import preview_csv
-from src.preprocessing import preprocess_log
+from src.autoencoder_model import apply_autoencoder
+from src.elastic_connector import send_alerts_to_elasticsearch
 from src.feature_engineering import (
     build_device_features,
     build_file_features,
     build_logon_features,
     merge_behavioral_features,
 )
-from src.rule_engine import apply_rule_engine
 from src.isolation_forest_model import apply_isolation_forest
+from src.load_data import preview_csv
+from src.preprocessing import preprocess_log
 from src.risk_analyzer import apply_risk_analysis
-from src.elastic_connector import send_alerts_to_elasticsearch
+from src.rule_engine import apply_rule_engine
 
 
 def build_sample_features(sample_size: int = 10000):
     """
     Load samples, preprocess logs and build behavioral features.
+
+    Parameters:
+        sample_size: number of rows loaded from each CERT r4.2 log file
+
+    Returns:
+        DataFrame containing UEBA behavioral features
     """
     print("Loading samples...")
     logon_sample = preview_csv(LOGON_FILE, nrows=sample_size)
@@ -68,13 +79,17 @@ def build_sample_features(sample_size: int = 10000):
     ueba_features = merge_behavioral_features(
         logon_features,
         device_features,
-        file_features
+        file_features,
     )
 
     return ueba_features
 
 
-def run_pipeline(sample_size: int = 10000, send_to_elasticsearch: bool = False):
+def run_pipeline(
+    sample_size: int = 10000,
+    send_to_elasticsearch: bool = False,
+    use_autoencoder: bool = False,
+):
     """
     Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
 
@@ -82,12 +97,20 @@ def run_pipeline(sample_size: int = 10000, send_to_elasticsearch: bool = False):
     1. Build behavioral features
     2. Apply rule-based scoring
     3. Apply Isolation Forest
-    4. Apply final risk analysis
-    5. Export features and alerts locally
-    6. Optionally send alerts to Elasticsearch
+    4. Optionally apply TensorFlow Autoencoder
+    5. Apply final risk analysis
+    6. Export features and alerts locally
+    7. Optionally send alerts to Elasticsearch
+
+    Parameters:
+        sample_size: number of rows loaded from each raw log file
+        send_to_elasticsearch: if True, send generated alerts to Elasticsearch
+        use_autoencoder: if True, apply TensorFlow Autoencoder anomaly detection
     """
     print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
+    print(f"Use TensorFlow Autoencoder: {use_autoencoder}")
+    print(f"Send to Elasticsearch: {send_to_elasticsearch}")
 
     ueba_features = build_sample_features(sample_size=sample_size)
 
@@ -97,8 +120,23 @@ def run_pipeline(sample_size: int = 10000, send_to_elasticsearch: bool = False):
     print("\nApplying Isolation Forest...")
     ml_scored_features, _, _ = apply_isolation_forest(
         rule_scored_features,
-        contamination=0.02
+        contamination=0.02,
     )
+
+    if use_autoencoder:
+        print("\nApplying TensorFlow Autoencoder...")
+        ml_scored_features, _, _ = apply_autoencoder(
+            ml_scored_features,
+            epochs=30,
+            batch_size=32,
+            threshold_percentile=98.0,
+        )
+
+        print("\nAutoencoder anomaly distribution:")
+        print(ml_scored_features["autoencoder_is_anomaly"].value_counts())
+
+        print("\nAutoencoder reconstruction error statistics:")
+        print(ml_scored_features["autoencoder_reconstruction_error"].describe())
 
     print("\nApplying final risk analysis...")
     final_results = apply_risk_analysis(ml_scored_features)
@@ -133,21 +171,29 @@ def run_pipeline(sample_size: int = 10000, send_to_elasticsearch: bool = False):
     print("\nRisk level distribution:")
     print(final_results["risk_level"].value_counts())
 
+    top_alert_columns = [
+        "user",
+        "day",
+        "risk_score",
+        "risk_level",
+        "alert_reason",
+        "rule_score",
+        "is_anomaly",
+        "anomaly_score",
+    ]
+
+    if use_autoencoder:
+        top_alert_columns.extend(
+            [
+                "autoencoder_is_anomaly",
+                "autoencoder_reconstruction_error",
+                "autoencoder_threshold",
+            ]
+        )
+
     print("\nTop alerts:")
     print(
-        alerts.sort_values("risk_score", ascending=False)
-        [
-            [
-                "user",
-                "day",
-                "risk_score",
-                "risk_level",
-                "alert_reason",
-                "rule_score",
-                "is_anomaly",
-                "anomaly_score",
-            ]
-        ]
+        alerts.sort_values("risk_score", ascending=False)[top_alert_columns]
         .head(10)
     )
 
@@ -167,13 +213,19 @@ def parse_arguments():
         "--sample-size",
         type=int,
         default=10000,
-        help="Number of rows to load from each raw log file. Default: 10000."
+        help="Number of rows to load from each raw log file. Default: 10000.",
     )
 
     parser.add_argument(
         "--send-to-elasticsearch",
         action="store_true",
-        help="Send generated alerts to Elasticsearch."
+        help="Send generated alerts to Elasticsearch.",
+    )
+
+    parser.add_argument(
+        "--use-autoencoder",
+        action="store_true",
+        help="Apply TensorFlow Autoencoder anomaly detection.",
     )
 
     return parser.parse_args()
@@ -187,7 +239,8 @@ def main():
 
     run_pipeline(
         sample_size=args.sample_size,
-        send_to_elasticsearch=args.send_to_elasticsearch
+        send_to_elasticsearch=args.send_to_elasticsearch,
+        use_autoencoder=args.use_autoencoder,
     )
 
 
