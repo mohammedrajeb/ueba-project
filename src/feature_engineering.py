@@ -10,6 +10,7 @@ Main feature groups:
 - USB/device behavior
 - File copy behavior
 - HTTP/web behavior
+- Email behavior
 
 The resulting feature table will be used by:
 - the rule-based risk engine
@@ -139,14 +140,119 @@ def build_http_features(http_df: pd.DataFrame) -> pd.DataFrame:
     return features
 
 
+def count_values_in_field(value) -> int:
+    """
+    Count values inside a recipient-like field.
+
+    CERT email fields such as to, cc and bcc may contain:
+    - empty values
+    - one recipient
+    - multiple recipients separated by semicolons
+
+    Returns:
+        Number of non-empty values
+    """
+    if pd.isna(value):
+        return 0
+
+    value = str(value).strip()
+
+    if value == "":
+        return 0
+
+    values = [
+        item.strip()
+        for item in value.replace(",", ";").split(";")
+        if item.strip()
+    ]
+
+    return len(values)
+
+
+def build_email_features(email_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build daily email behavior features by user.
+
+    Features created:
+    - email_events: total number of email events
+    - email_outside_hours: number of email events outside working hours
+    - total_email_size: total email size sent by the user
+    - avg_email_size: average email size
+    - total_attachments: total number of attachments
+    - emails_with_attachments: number of emails containing attachments
+    - to_recipients_count: number of recipients in the 'to' field
+    - cc_recipients_count: number of recipients in the 'cc' field
+    - bcc_recipients_count: number of recipients in the 'bcc' field
+    - unique_email_pcs: number of PCs used for email activity
+    """
+    df = email_df.copy()
+
+    required_columns = ["user", "day", "pc", "outside_working_hours"]
+
+    for column in required_columns:
+        if column not in df.columns:
+            raise KeyError(f"The email log must contain a '{column}' column.")
+
+    if "size" not in df.columns:
+        df["size"] = 0
+
+    df["size"] = pd.to_numeric(df["size"], errors="coerce").fillna(0)
+
+    # CERT versions may use either 'attachments' or 'attachment_count'
+    if "attachments" in df.columns:
+        attachment_column = "attachments"
+    elif "attachment_count" in df.columns:
+        attachment_column = "attachment_count"
+    else:
+        attachment_column = None
+        df["attachment_count_clean"] = 0
+
+    if attachment_column is not None:
+        df["attachment_count_clean"] = pd.to_numeric(
+            df[attachment_column],
+            errors="coerce"
+        ).fillna(0)
+
+    if "to" not in df.columns:
+        df["to"] = ""
+
+    if "cc" not in df.columns:
+        df["cc"] = ""
+
+    if "bcc" not in df.columns:
+        df["bcc"] = ""
+
+    df["to_count"] = df["to"].apply(count_values_in_field)
+    df["cc_count"] = df["cc"].apply(count_values_in_field)
+    df["bcc_count"] = df["bcc"].apply(count_values_in_field)
+
+    df["has_attachment"] = (df["attachment_count_clean"] > 0).astype(int)
+
+    features = df.groupby(["user", "day"]).agg(
+        email_events=("pc", "count"),
+        email_outside_hours=("outside_working_hours", "sum"),
+        total_email_size=("size", "sum"),
+        avg_email_size=("size", "mean"),
+        total_attachments=("attachment_count_clean", "sum"),
+        emails_with_attachments=("has_attachment", "sum"),
+        to_recipients_count=("to_count", "sum"),
+        cc_recipients_count=("cc_count", "sum"),
+        bcc_recipients_count=("bcc_count", "sum"),
+        unique_email_pcs=("pc", "nunique"),
+    ).reset_index()
+
+    return features
+
+
 def merge_behavioral_features(
     logon_features: pd.DataFrame,
     device_features: pd.DataFrame,
     file_features: pd.DataFrame,
     http_features: pd.DataFrame | None = None,
+    email_features: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
-    Merge logon, device, file copy and optional HTTP features
+    Merge logon, device, file copy, optional HTTP and optional email features
     into one UEBA feature table.
 
     The merge is done using:
@@ -171,6 +277,13 @@ def merge_behavioral_features(
     if http_features is not None:
         features = features.merge(
             http_features,
+            on=["user", "day"],
+            how="outer",
+        )
+
+    if email_features is not None:
+        features = features.merge(
+            email_features,
             on=["user", "day"],
             how="outer",
         )

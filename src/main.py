@@ -9,22 +9,23 @@ This script runs the complete UEBA pipeline:
 2. Apply preprocessing
 3. Build behavioral features by user and day
 4. Optionally include HTTP/web behavior features
-5. Apply the rule-based UEBA risk engine
-6. Apply Isolation Forest anomaly detection
-7. Optionally apply TensorFlow Autoencoder anomaly detection
-8. Apply final risk analysis
-9. Export local results:
+5. Optionally include email behavior features
+6. Apply the rule-based UEBA risk engine
+7. Apply Isolation Forest anomaly detection
+8. Optionally apply TensorFlow Autoencoder anomaly detection
+9. Apply final risk analysis
+10. Export local results:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
-10. Optionally send alerts to Elasticsearch
+11. Optionally send alerts to Elasticsearch
 
 Examples:
     python -m src.main --sample-size 10000
-    python -m src.main --sample-size 50000
     python -m src.main --sample-size 10000 --include-http
-    python -m src.main --sample-size 10000 --use-autoencoder
-    python -m src.main --sample-size 10000 --include-http --use-autoencoder
-    python -m src.main --sample-size 10000 --include-http --use-autoencoder --send-to-elasticsearch
+    python -m src.main --sample-size 10000 --include-email
+    python -m src.main --sample-size 10000 --include-http --include-email
+    python -m src.main --sample-size 10000 --include-http --include-email --use-autoencoder
+    python -m src.main --sample-size 10000 --include-http --include-email --use-autoencoder --send-to-elasticsearch
 """
 
 import argparse
@@ -33,6 +34,7 @@ from src.config import (
     ALERTS_DATA_DIR,
     ALERTS_FILE,
     DEVICE_FILE,
+    EMAIL_FILE,
     FILE_FILE,
     HTTP_FILE,
     LOGON_FILE,
@@ -43,6 +45,7 @@ from src.autoencoder_model import apply_autoencoder
 from src.elastic_connector import send_alerts_to_elasticsearch
 from src.feature_engineering import (
     build_device_features,
+    build_email_features,
     build_file_features,
     build_http_features,
     build_logon_features,
@@ -58,6 +61,7 @@ from src.rule_engine import apply_rule_engine
 def build_sample_features(
     sample_size: int = 10000,
     include_http: bool = False,
+    include_email: bool = False,
 ):
     """
     Load samples, preprocess logs and build behavioral features.
@@ -65,6 +69,7 @@ def build_sample_features(
     Parameters:
         sample_size: number of rows loaded from each CERT r4.2 log file
         include_http: if True, include HTTP/web behavior features from http.csv
+        include_email: if True, include email behavior features from email.csv
 
     Returns:
         DataFrame containing UEBA behavioral features
@@ -79,6 +84,11 @@ def build_sample_features(
         print("Loading HTTP sample...")
         http_sample = preview_csv(HTTP_FILE, nrows=sample_size)
 
+    email_sample = None
+    if include_email:
+        print("Loading Email sample...")
+        email_sample = preview_csv(EMAIL_FILE, nrows=sample_size)
+
     print("Preprocessing samples...")
     logon_processed = preprocess_log(logon_sample)
     device_processed = preprocess_log(device_sample)
@@ -87,6 +97,10 @@ def build_sample_features(
     http_processed = None
     if include_http and http_sample is not None:
         http_processed = preprocess_log(http_sample)
+
+    email_processed = None
+    if include_email and email_sample is not None:
+        email_processed = preprocess_log(email_sample)
 
     print("Building behavioral features...")
     logon_features = build_logon_features(logon_processed)
@@ -98,11 +112,17 @@ def build_sample_features(
         print("Building HTTP behavior features...")
         http_features = build_http_features(http_processed)
 
+    email_features = None
+    if include_email and email_processed is not None:
+        print("Building Email behavior features...")
+        email_features = build_email_features(email_processed)
+
     ueba_features = merge_behavioral_features(
         logon_features,
         device_features,
         file_features,
         http_features=http_features,
+        email_features=email_features,
     )
 
     return ueba_features
@@ -113,6 +133,7 @@ def run_pipeline(
     send_to_elasticsearch: bool = False,
     use_autoencoder: bool = False,
     include_http: bool = False,
+    include_email: bool = False,
 ):
     """
     Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
@@ -120,28 +141,32 @@ def run_pipeline(
     Steps:
     1. Build behavioral features
     2. Optionally include HTTP behavior features
-    3. Apply rule-based scoring
-    4. Apply Isolation Forest
-    5. Optionally apply TensorFlow Autoencoder
-    6. Apply final risk analysis
-    7. Export features and alerts locally
-    8. Optionally send alerts to Elasticsearch
+    3. Optionally include email behavior features
+    4. Apply rule-based scoring
+    5. Apply Isolation Forest
+    6. Optionally apply TensorFlow Autoencoder
+    7. Apply final risk analysis
+    8. Export features and alerts locally
+    9. Optionally send alerts to Elasticsearch
 
     Parameters:
         sample_size: number of rows loaded from each raw log file
         send_to_elasticsearch: if True, send generated alerts to Elasticsearch
         use_autoencoder: if True, apply TensorFlow Autoencoder anomaly detection
         include_http: if True, include HTTP/web behavior features
+        include_email: if True, include email behavior features
     """
     print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
     print(f"Include HTTP logs: {include_http}")
+    print(f"Include Email logs: {include_email}")
     print(f"Use TensorFlow Autoencoder: {use_autoencoder}")
     print(f"Send to Elasticsearch: {send_to_elasticsearch}")
 
     ueba_features = build_sample_features(
         sample_size=sample_size,
         include_http=include_http,
+        include_email=include_email,
     )
 
     print("\nApplying rule engine...")
@@ -222,6 +247,19 @@ def run_pipeline(
             ]
         )
 
+    if include_email:
+        top_alert_columns.extend(
+            [
+                "email_events",
+                "email_outside_hours",
+                "total_email_size",
+                "avg_email_size",
+                "total_attachments",
+                "emails_with_attachments",
+                "bcc_recipients_count",
+            ]
+        )
+
     if use_autoencoder:
         top_alert_columns.extend(
             [
@@ -279,6 +317,12 @@ def parse_arguments():
         help="Include HTTP behavior features from http.csv.",
     )
 
+    parser.add_argument(
+        "--include-email",
+        action="store_true",
+        help="Include email behavior features from email.csv.",
+    )
+
     return parser.parse_args()
 
 
@@ -293,6 +337,7 @@ def main():
         send_to_elasticsearch=args.send_to_elasticsearch,
         use_autoencoder=args.use_autoencoder,
         include_http=args.include_http,
+        include_email=args.include_email,
     )
 
 
