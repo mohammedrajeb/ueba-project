@@ -3,27 +3,28 @@ main.py
 
 Main entry point of the UEBA project.
 
-This script will execute the complete UEBA pipeline:
+Current step:
+- Inspect the CERT r4.2 raw log files
+- Verify that logon.csv, device.csv and file.csv are accessible
+- Display file size, columns and first rows
 
-1. Load CERT r4.2 logs
-2. Preprocess the data
-3. Build behavioral features
-4. Apply the rule-based scoring engine
-5. Train and apply the Isolation Forest model
-6. Calculate the final risk score
-7. Generate UEBA alerts
-8. Export alerts to CSV
-9. Later: send alerts to Elasticsearch
-
-The first version of this file will be completed after testing each module separately.
+This step validates the local data setup before building preprocessing
+and feature engineering modules.
 """
+
+from src.config import DEVICE_FILE, FILE_FILE, LOGON_FILE
+from src.load_data import inspect_csv
 
 
 def main():
     """
-    Main function of the UEBA pipeline.
+    Run the current UEBA pipeline step.
     """
-    print("UEBA pipeline will be implemented step by step.")
+    print("UEBA project - CERT r4.2 log inspection")
+
+    inspect_csv(LOGON_FILE, "logon.csv")
+    inspect_csv(DEVICE_FILE, "device.csv")
+    inspect_csv(FILE_FILE, "file.csv")
 
 
 if __name__ == "__main__":
