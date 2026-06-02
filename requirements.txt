@@ -5,4 +5,4 @@ matplotlib
 jupyter
 notebook
 tensorflow
-elasticsearch
+elasticsearch==8.13.2

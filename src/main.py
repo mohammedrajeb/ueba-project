@@ -14,11 +14,11 @@ This script runs the complete UEBA pipeline:
 7. Export local results:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
+8. Optionally send alerts to Elasticsearch
 
-The sample size can be configured from the command line.
-
-Example:
+Examples:
     python -m src.main --sample-size 10000
+    python -m src.main --sample-size 50000 --send-to-elasticsearch
 """
 
 import argparse
@@ -43,6 +43,7 @@ from src.feature_engineering import (
 from src.rule_engine import apply_rule_engine
 from src.isolation_forest_model import apply_isolation_forest
 from src.risk_analyzer import apply_risk_analysis
+from src.elastic_connector import send_alerts_to_elasticsearch
 
 
 def build_sample_features(sample_size: int = 10000):
@@ -73,7 +74,7 @@ def build_sample_features(sample_size: int = 10000):
     return ueba_features
 
 
-def run_pipeline(sample_size: int = 10000):
+def run_pipeline(sample_size: int = 10000, send_to_elasticsearch: bool = False):
     """
     Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
 
@@ -83,6 +84,7 @@ def run_pipeline(sample_size: int = 10000):
     3. Apply Isolation Forest
     4. Apply final risk analysis
     5. Export features and alerts locally
+    6. Optionally send alerts to Elasticsearch
     """
     print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
@@ -113,6 +115,10 @@ def run_pipeline(sample_size: int = 10000):
 
     print("\nExporting UEBA alerts...")
     alerts.to_csv(ALERTS_FILE, index=False)
+
+    if send_to_elasticsearch:
+        print("\nSending alerts to Elasticsearch...")
+        send_alerts_to_elasticsearch(alerts, reset=True)
 
     print("\nExport completed successfully.")
     print(f"Features saved to: {UEBA_FEATURES_FILE}")
@@ -164,6 +170,12 @@ def parse_arguments():
         help="Number of rows to load from each raw log file. Default: 10000."
     )
 
+    parser.add_argument(
+        "--send-to-elasticsearch",
+        action="store_true",
+        help="Send generated alerts to Elasticsearch."
+    )
+
     return parser.parse_args()
 
 
@@ -172,7 +184,11 @@ def main():
     Run the UEBA pipeline with command-line parameters.
     """
     args = parse_arguments()
-    run_pipeline(sample_size=args.sample_size)
+
+    run_pipeline(
+        sample_size=args.sample_size,
+        send_to_elasticsearch=args.send_to_elasticsearch
+    )
 
 
 if __name__ == "__main__":
