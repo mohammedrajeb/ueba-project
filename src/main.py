@@ -19,6 +19,7 @@ This script runs the complete UEBA pipeline:
     - data/processed/ueba_features.csv
     - data/alerts/alerts.csv
 12. Optionally send alerts to Elasticsearch
+13. Optionally save trained models in the models/ directory
 
 Examples:
     python -m src.main --sample-size 10000
@@ -28,19 +29,34 @@ Examples:
     python -m src.main --sample-size 10000 --include-http --include-email --include-ldap
     python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder
     python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch
+    python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch --save-models
 """
 
 import argparse
+import json
+from datetime import datetime
+
+import joblib
 
 from src.config import (
     ALERTS_DATA_DIR,
     ALERTS_FILE,
+    AUTOENCODER_BATCH_SIZE,
+    AUTOENCODER_EPOCHS,
+    AUTOENCODER_MODEL_FILE,
+    AUTOENCODER_SCALER_FILE,
+    AUTOENCODER_THRESHOLD_PERCENTILE,
     DEVICE_FILE,
     EMAIL_FILE,
     FILE_FILE,
     HTTP_FILE,
+    ISOLATION_FOREST_CONTAMINATION,
+    ISOLATION_FOREST_MODEL_FILE,
+    ISOLATION_FOREST_SCALER_FILE,
     LDAP_DIR,
     LOGON_FILE,
+    MODEL_METADATA_FILE,
+    MODELS_DIR,
     PROCESSED_DATA_DIR,
     UEBA_FEATURES_FILE,
 )
@@ -132,6 +148,56 @@ def build_sample_features(
     return ueba_features
 
 
+def save_trained_models(
+    isolation_forest_model,
+    isolation_forest_scaler,
+    autoencoder_model=None,
+    autoencoder_scaler=None,
+    metadata: dict | None = None,
+):
+    """
+    Save trained models and scalers in the models/ directory.
+
+    Files saved:
+    - isolation_forest_model.pkl
+    - isolation_forest_scaler.pkl
+    - autoencoder_model.keras, if Autoencoder is enabled
+    - autoencoder_scaler.pkl, if Autoencoder is enabled
+    - model_metadata.json
+    """
+    print("\nSaving trained models...")
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+    joblib.dump(isolation_forest_model, ISOLATION_FOREST_MODEL_FILE)
+    joblib.dump(isolation_forest_scaler, ISOLATION_FOREST_SCALER_FILE)
+
+    print(f"Isolation Forest model saved to: {ISOLATION_FOREST_MODEL_FILE}")
+    print(f"Isolation Forest scaler saved to: {ISOLATION_FOREST_SCALER_FILE}")
+
+    if autoencoder_model is not None and autoencoder_scaler is not None:
+        autoencoder_model.save(AUTOENCODER_MODEL_FILE)
+        joblib.dump(autoencoder_scaler, AUTOENCODER_SCALER_FILE)
+
+        print(f"Autoencoder model saved to: {AUTOENCODER_MODEL_FILE}")
+        print(f"Autoencoder scaler saved to: {AUTOENCODER_SCALER_FILE}")
+
+    if metadata is None:
+        metadata = {}
+
+    metadata["saved_at"] = datetime.now().isoformat(timespec="seconds")
+    metadata["isolation_forest_model_file"] = str(ISOLATION_FOREST_MODEL_FILE)
+    metadata["isolation_forest_scaler_file"] = str(ISOLATION_FOREST_SCALER_FILE)
+
+    if autoencoder_model is not None:
+        metadata["autoencoder_model_file"] = str(AUTOENCODER_MODEL_FILE)
+        metadata["autoencoder_scaler_file"] = str(AUTOENCODER_SCALER_FILE)
+
+    with open(MODEL_METADATA_FILE, "w", encoding="utf-8") as metadata_file:
+        json.dump(metadata, metadata_file, indent=4)
+
+    print(f"Model metadata saved to: {MODEL_METADATA_FILE}")
+
+
 def run_pipeline(
     sample_size: int = 10000,
     send_to_elasticsearch: bool = False,
@@ -139,6 +205,7 @@ def run_pipeline(
     include_http: bool = False,
     include_email: bool = False,
     include_ldap: bool = False,
+    save_models: bool = False,
 ):
     """
     Run the complete UEBA pipeline on a sample of the CERT r4.2 logs.
@@ -150,6 +217,7 @@ def run_pipeline(
         include_http: if True, include HTTP/web behavior features
         include_email: if True, include email behavior features
         include_ldap: if True, enrich final results with LDAP context
+        save_models: if True, save trained models in the models/ directory
     """
     print("UEBA project - Full pipeline with local export")
     print(f"Sample size per file: {sample_size}")
@@ -158,6 +226,7 @@ def run_pipeline(
     print(f"Include LDAP context: {include_ldap}")
     print(f"Use TensorFlow Autoencoder: {use_autoencoder}")
     print(f"Send to Elasticsearch: {send_to_elasticsearch}")
+    print(f"Save trained models: {save_models}")
 
     ueba_features = build_sample_features(
         sample_size=sample_size,
@@ -169,18 +238,23 @@ def run_pipeline(
     rule_scored_features = apply_rule_engine(ueba_features)
 
     print("\nApplying Isolation Forest...")
-    ml_scored_features, _, _ = apply_isolation_forest(
-        rule_scored_features,
-        contamination=0.02,
+    ml_scored_features, isolation_forest_model, isolation_forest_scaler = (
+        apply_isolation_forest(
+            rule_scored_features,
+            contamination=ISOLATION_FOREST_CONTAMINATION,
+        )
     )
+
+    autoencoder_model = None
+    autoencoder_scaler = None
 
     if use_autoencoder:
         print("\nApplying TensorFlow Autoencoder...")
-        ml_scored_features, _, _ = apply_autoencoder(
+        ml_scored_features, autoencoder_model, autoencoder_scaler = apply_autoencoder(
             ml_scored_features,
-            epochs=30,
-            batch_size=32,
-            threshold_percentile=98.0,
+            epochs=AUTOENCODER_EPOCHS,
+            batch_size=AUTOENCODER_BATCH_SIZE,
+            threshold_percentile=AUTOENCODER_THRESHOLD_PERCENTILE,
         )
 
         print("\nAutoencoder anomaly distribution:")
@@ -211,6 +285,37 @@ def run_pipeline(
 
     print("\nExporting UEBA alerts...")
     alerts.to_csv(ALERTS_FILE, index=False)
+
+    if save_models:
+        model_metadata = {
+            "sample_size": sample_size,
+            "include_http": include_http,
+            "include_email": include_email,
+            "include_ldap": include_ldap,
+            "use_autoencoder": use_autoencoder,
+            "send_to_elasticsearch": send_to_elasticsearch,
+            "features_shape": list(final_results.shape),
+            "alerts_shape": list(alerts.shape),
+            "risk_level_distribution": final_results["risk_level"]
+            .value_counts()
+            .to_dict(),
+            "isolation_forest_contamination": ISOLATION_FOREST_CONTAMINATION,
+            "autoencoder_epochs": AUTOENCODER_EPOCHS if use_autoencoder else None,
+            "autoencoder_batch_size": AUTOENCODER_BATCH_SIZE
+            if use_autoencoder
+            else None,
+            "autoencoder_threshold_percentile": AUTOENCODER_THRESHOLD_PERCENTILE
+            if use_autoencoder
+            else None,
+        }
+
+        save_trained_models(
+            isolation_forest_model=isolation_forest_model,
+            isolation_forest_scaler=isolation_forest_scaler,
+            autoencoder_model=autoencoder_model,
+            autoencoder_scaler=autoencoder_scaler,
+            metadata=model_metadata,
+        )
 
     if send_to_elasticsearch:
         print("\nSending alerts to Elasticsearch...")
@@ -346,6 +451,12 @@ def parse_arguments():
         help="Enrich UEBA results with LDAP organizational context.",
     )
 
+    parser.add_argument(
+        "--save-models",
+        action="store_true",
+        help="Save trained models and scalers in the models/ directory.",
+    )
+
     return parser.parse_args()
 
 
@@ -362,6 +473,7 @@ def main():
         include_http=args.include_http,
         include_email=args.include_email,
         include_ldap=args.include_ldap,
+        save_models=args.save_models,
     )
 
 

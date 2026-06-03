@@ -7,6 +7,7 @@ It contains:
 - paths to raw data
 - paths to processed data
 - paths to generated alerts
+- paths to trained models
 - model parameters
 - risk scoring thresholds
 - Elasticsearch configuration
@@ -41,6 +42,13 @@ LDAP_DIR = RAW_DATA_DIR / "LDAP"
 # Output files
 UEBA_FEATURES_FILE = PROCESSED_DATA_DIR / "ueba_features.csv"
 ALERTS_FILE = ALERTS_DATA_DIR / "alerts.csv"
+
+# Trained model output files
+ISOLATION_FOREST_MODEL_FILE = MODELS_DIR / "isolation_forest_model.pkl"
+ISOLATION_FOREST_SCALER_FILE = MODELS_DIR / "isolation_forest_scaler.pkl"
+AUTOENCODER_MODEL_FILE = MODELS_DIR / "autoencoder_model.keras"
+AUTOENCODER_SCALER_FILE = MODELS_DIR / "autoencoder_scaler.pkl"
+MODEL_METADATA_FILE = MODELS_DIR / "model_metadata.json"
 
 # Working hours used to detect abnormal activity
 WORKING_HOUR_START = 7
