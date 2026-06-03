@@ -1,0 +1,31 @@
+{
+    "sample_size": 10000,
+    "include_http": true,
+    "include_email": true,
+    "include_ldap": true,
+    "use_autoencoder": true,
+    "send_to_elasticsearch": false,
+    "features_shape": [
+        4816,
+        50
+    ],
+    "alerts_shape": [
+        1708,
+        50
+    ],
+    "risk_level_distribution": {
+        "low": 4377,
+        "medium": 324,
+        "critical": 84,
+        "high": 31
+    },
+    "isolation_forest_contamination": 0.02,
+    "autoencoder_epochs": 30,
+    "autoencoder_batch_size": 32,
+    "autoencoder_threshold_percentile": 98.0,
+    "saved_at": "2026-06-04T00:13:29",
+    "isolation_forest_model_file": "C:\\Users\\rajeb\\Documents\\ueba-project\\models\\isolation_forest_model.pkl",
+    "isolation_forest_scaler_file": "C:\\Users\\rajeb\\Documents\\ueba-project\\models\\isolation_forest_scaler.pkl",
+    "autoencoder_model_file": "C:\\Users\\rajeb\\Documents\\ueba-project\\models\\autoencoder_model.keras",
+    "autoencoder_scaler_file": "C:\\Users\\rajeb\\Documents\\ueba-project\\models\\autoencoder_scaler.pkl"
+}
