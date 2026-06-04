@@ -350,8 +350,9 @@ Le dashboard est **fonctionnel et enrichi**. Il couvre :
 - [x] Anomalies TensorFlow Autoencoder
 - [x] Alertes avec activité email
 
-Cette version correspond au **dashboard final** du projet UEBA.
 
 ---
 
-*Généré dans le cadre du projet UEBA — EMSI 4CIR Anfa*
+---
+
+*Projet UEBA — EMSI 4CIR Anfa*

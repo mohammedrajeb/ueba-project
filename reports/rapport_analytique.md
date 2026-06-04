@@ -576,4 +576,4 @@ Le projet constitue une base solide pour un système UEBA plus avancé, capable 
 
 ---
 
-*Rapport généré dans le cadre du projet UEBA — EMSI 4CIR Anfa*
+*Projet UEBA — EMSI 4CIR Anfa*

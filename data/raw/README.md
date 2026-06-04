@@ -48,10 +48,4 @@ data/raw/
 └── readme.txt
 ```
 
----
-
-## Remarques importantes
-
-- Le dataset brut est intentionnellement exclu de Git via `.gitignore` en raison de la taille importante de certains fichiers comme `http.csv`.
-- Seuls le code du projet, les résultats traités, les modèles entraînés, les rapports, les figures, les notebooks et les fichiers du dashboard sont versionnés sur GitHub.
-- **Ne pas committer les fichiers du dataset brut dans le dépôt.**
+*Projet UEBA — EMSI 4CIR Anfa*
