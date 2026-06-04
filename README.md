@@ -1,186 +1,184 @@
-# UEBA Security Project
+# Projet UEBA — Sécurité
 
-> **User and Entity Behavior Analytics (UEBA)** — CERT Insider Threat Dataset r4.2
+> **User and Entity Behavior Analytics (UEBA)** — Dataset CERT Insider Threat r4.2
 > **Stack :** Python · Scikit-learn · TensorFlow · Elasticsearch · Grafana · Docker
 
-This project implements a full UEBA pipeline, from raw log ingestion to alert visualization, anomaly detection, model persistence, and context enrichment.
+Ce projet implémente un pipeline UEBA complet, de l'ingestion des logs bruts jusqu'à la visualisation des alertes, la détection d'anomalies, la persistance des modèles et l'enrichissement contextuel.
 
 ---
 
-## Project Structure
-
-## Project Structure
+## Structure du projet
 
 ```text
 ueba-project/
 │
 ├── data/
-│   ├── raw/                         # Raw CERT logs: logon, device, file, http, email, LDAP
-│   ├── processed/                   # Processed UEBA features
-│   └── alerts/                      # Generated UEBA alerts
+│   ├── raw/                         # Logs bruts CERT : logon, device, file, http, email, LDAP
+│   ├── processed/                   # Variables comportementales traitées
+│   └── alerts/                      # Alertes UEBA générées
 │
 ├── Demonstration_Finale/
-│   ├── Demo_1.png                   # Final execution screenshot: full pipeline and model saving
-│   └── Demo_2.png                   # Final execution screenshot: Docker, Elasticsearch and command output
+│   ├── Demo_1.png                   # Capture finale : pipeline complet et sauvegarde des modèles
+│   └── Demo_2.png                   # Capture finale : Docker, Elasticsearch et sortie de commande
 │
 ├── dashboards/
-│   ├── grafana_dashboard.json       # Exported Grafana dashboard
-│   └── grafana_dashboard_notes.md   # Dashboard documentation
+│   ├── grafana_dashboard.json       # Dashboard Grafana exporté
+│   └── grafana_dashboard_notes.md   # Documentation du dashboard
 │
 ├── models/
-│   ├── isolation_forest_model.pkl   # Trained Isolation Forest model
-│   ├── isolation_forest_scaler.pkl  # Scaler used for Isolation Forest
-│   ├── autoencoder_model.keras      # Trained TensorFlow Autoencoder model
-│   ├── autoencoder_scaler.pkl       # Scaler used for Autoencoder
-│   └── model_metadata.json          # Metadata about the saved models
+│   ├── isolation_forest_model.pkl   # Modèle Isolation Forest entraîné
+│   ├── isolation_forest_scaler.pkl  # Scaler utilisé pour Isolation Forest
+│   ├── autoencoder_model.keras      # Modèle TensorFlow Autoencoder entraîné
+│   ├── autoencoder_scaler.pkl       # Scaler utilisé pour l'Autoencoder
+│   └── model_metadata.json          # Métadonnées sur les modèles sauvegardés
 │
 ├── notebooks/
 │   └── 01_ueba_results_analysis.ipynb
 │
 ├── reports/
-│   ├── figures/                     # Figures generated for the analytical report
-│   ├── tables/                      # Optional statistical tables
-│   └── rapport_analytique.md        # Project analytical report
+│   ├── figures/                     # Figures générées pour le rapport analytique
+│   ├── tables/                      # Tableaux statistiques optionnels
+│   └── rapport_analytique.md        # Rapport analytique du projet
 │
 ├── src/
-│   ├── config.py                    # Central configuration and paths
-│   ├── load_data.py                 # Secure CSV file loading
-│   ├── preprocessing.py             # Date parsing and temporal features
-│   ├── feature_engineering.py       # Behavioral feature engineering
-│   ├── rule_engine.py               # Rule-based risk scoring
-│   ├── isolation_forest_model.py    # Isolation Forest anomaly detection
-│   ├── autoencoder_model.py         # TensorFlow Autoencoder anomaly detection
-│   ├── risk_analyzer.py             # Final risk score computation
-│   ├── context_enrichment.py        # LDAP context enrichment
-│   ├── elastic_connector.py         # Elasticsearch indexing
-│   └── main.py                      # Pipeline entry point
+│   ├── config.py                    # Configuration centrale et chemins
+│   ├── load_data.py                 # Chargement sécurisé des fichiers CSV
+│   ├── preprocessing.py             # Analyse des dates et variables temporelles
+│   ├── feature_engineering.py       # Construction des variables comportementales
+│   ├── rule_engine.py               # Scoring de risque par règles
+│   ├── isolation_forest_model.py    # Détection d'anomalies par Isolation Forest
+│   ├── autoencoder_model.py         # Détection d'anomalies par TensorFlow Autoencoder
+│   ├── risk_analyzer.py             # Calcul du score de risque final
+│   ├── context_enrichment.py        # Enrichissement contextuel LDAP
+│   ├── elastic_connector.py         # Indexation dans Elasticsearch
+│   └── main.py                      # Point d'entrée du pipeline
 │
-├── docker-compose.yml               # Elasticsearch and Grafana services
-├── environment.yml                  # Conda environment definition
-├── requirements.txt                 # Python dependencies
-├── .gitignore                       # Git ignored files
-└── README.md                        # Project documentation
+├── docker-compose.yml               # Services Elasticsearch et Grafana
+├── environment.yml                  # Définition de l'environnement Conda
+├── requirements.txt                 # Dépendances Python
+├── .gitignore                       # Fichiers exclus de Git
+└── README.md                        # Documentation du projet
 ```
 
 ---
 
-## Pipeline Overview
+## Vue d'ensemble du pipeline
 
 ```
 Logs CERT r4.2
       ↓
-Preprocessing
+Prétraitement
       ↓
 Feature Engineering (logon · device · file · http · email)
       ↓
-Rule Engine
+Moteur de règles
       ↓
 Isolation Forest
       ↓
 TensorFlow Autoencoder
       ↓
-Risk Analyzer
+Analyseur de risque
       ↓
-LDAP Context Enrichment
+Enrichissement LDAP
       ↓
 Export CSV
       ↓
-Model Saving
+Sauvegarde des modèles
       ↓
 Elasticsearch
       ↓
-Grafana Dashboard
+Dashboard Grafana
 ```
 
 ---
 
-## Features
+## Fonctionnalités
 
-### 1. Behavioral Feature Engineering
+### 1. Construction des variables comportementales
 
-Features are aggregated per `user + day` from five log sources.
+Les variables sont agrégées par `utilisateur + jour` à partir de cinq sources de logs.
 
-| Source       | Features extracted                                                                |
-|--------------|-----------------------------------------------------------------------------------|
-| `logon.csv`  | Logon/logoff events, outside-hours activity, unique PCs                           |
-| `device.csv` | USB connect/disconnect events, outside-hours activity, unique PCs                 |
-| `file.csv`   | File copy events, outside-hours copies, unique files and PCs                      |
-| `http.csv`   | HTTP events, outside-hours activity, unique URLs, unique domains and PCs          |
-| `email.csv`  | Email volume, attachments, BCC usage, outside-hours activity and email size       |
+| Source       | Variables extraites                                                                        |
+|--------------|--------------------------------------------------------------------------------------------|
+| `logon.csv`  | Connexions/déconnexions, activité hors horaires, postes uniques                            |
+| `device.csv` | Connexions/déconnexions USB, activité hors horaires, postes uniques                        |
+| `file.csv`   | Copies de fichiers, copies hors horaires, fichiers et postes uniques                       |
+| `http.csv`   | Événements HTTP, activité hors horaires, URLs uniques, domaines et postes uniques          |
+| `email.csv`  | Volume d'emails, pièces jointes, usage BCC, activité hors horaires et taille des emails    |
 
-### 2. Rule-Based Risk Scoring
+### 2. Scoring de risque par règles
 
-The rule engine generates a preliminary `rule_score` based on domain rules covering:
+Le moteur de règles génère un `rule_score` préliminaire basé sur des règles métier couvrant :
 
-- outside-hours activity;
-- USB usage;
-- USB activity outside working hours;
-- high file-copy volume;
-- file-copy activity outside working hours;
-- multi-PC usage;
-- dangerous behavioral combinations.
+- activité hors horaires de travail ;
+- utilisation de périphériques USB ;
+- activité USB hors horaires de travail ;
+- volume élevé de copies de fichiers ;
+- copies de fichiers hors horaires de travail ;
+- utilisation de plusieurs postes ;
+- combinaisons comportementales dangereuses.
 
-The rule engine also produces `rule_reasons`, making the detection explainable.
+Le moteur produit également `rule_reasons`, rendant la détection explicable.
 
-### 3. Anomaly Detection
+### 3. Détection d'anomalies
 
-| Model                  | Approach                                                                          |
-|------------------------|-----------------------------------------------------------------------------------|
-| Isolation Forest       | Unsupervised anomaly detection with `contamination=0.02`                          |
-| TensorFlow Autoencoder | Reconstruction-error anomaly detection using the 98th percentile threshold        |
+| Modèle                 | Approche                                                                                   |
+|------------------------|--------------------------------------------------------------------------------------------|
+| Isolation Forest       | Détection d'anomalies non supervisée avec `contamination=0.02`                             |
+| TensorFlow Autoencoder | Détection par erreur de reconstruction avec seuil au percentile 98                         |
 
-The anomaly detection layer adds the following fields:
+La couche de détection d'anomalies ajoute les champs suivants :
 
-| Field                              | Description                                     |
-|------------------------------------|-------------------------------------------------|
-| `is_anomaly`                       | Isolation Forest anomaly flag                   |
-| `anomaly_score`                    | Isolation Forest anomaly score                  |
-| `autoencoder_is_anomaly`           | TensorFlow Autoencoder anomaly flag             |
-| `autoencoder_reconstruction_error` | Reconstruction error from the Autoencoder       |
-| `autoencoder_threshold`            | Threshold used for Autoencoder anomaly detection|
+| Champ                              | Description                                              |
+|------------------------------------|----------------------------------------------------------|
+| `is_anomaly`                       | Indicateur d'anomalie Isolation Forest                   |
+| `anomaly_score`                    | Score d'anomalie Isolation Forest                        |
+| `autoencoder_is_anomaly`           | Indicateur d'anomalie TensorFlow Autoencoder             |
+| `autoencoder_reconstruction_error` | Erreur de reconstruction de l'Autoencoder                |
+| `autoencoder_threshold`            | Seuil utilisé pour la détection par l'Autoencoder        |
 
-### 4. LDAP Context Enrichment
+### 4. Enrichissement contextuel LDAP
 
-LDAP snapshots are used to enrich alerts with organizational context.
+Les snapshots LDAP sont utilisés pour enrichir les alertes avec le contexte organisationnel.
 
-Added fields include: `employee_name`, `role`, `position`, `business_unit`, `functional_unit`, `department`, `team`, `supervisor`, `ldap_source_file`.
+Les champs ajoutés sont : `employee_name`, `role`, `position`, `business_unit`, `functional_unit`, `department`, `team`, `supervisor`, `ldap_source_file`.
 
-LDAP is not used directly to calculate the risk score. It is used to help analysts understand the organizational context of each alert.
+Le LDAP n'est pas utilisé directement dans le calcul du score de risque. Il permet à l'analyste de comprendre le contexte organisationnel de chaque alerte.
 
-### 5. Final Risk Analysis
+### 5. Analyse de risque finale
 
-The final risk analyzer combines:
+L'analyseur de risque final combine :
 
-- rule-based score;
-- Isolation Forest anomaly detection;
-- TensorFlow Autoencoder anomaly detection.
+- le score issu du moteur de règles ;
+- la détection d'anomalies par Isolation Forest ;
+- la détection d'anomalies par TensorFlow Autoencoder.
 
-It produces:
+Il produit :
 
-| Output         | Description                             |
-|----------------|-----------------------------------------|
-| `risk_score`   | Final score from 0 to 100               |
-| `risk_level`   | `low`, `medium`, `high`, or `critical`  |
-| `alert_reason` | Human-readable explanation              |
+| Sortie         | Description                                  |
+|----------------|----------------------------------------------|
+| `risk_score`   | Score final de 0 à 100                       |
+| `risk_level`   | `low`, `medium`, `high` ou `critical`        |
+| `alert_reason` | Explication lisible de l'alerte              |
 
-Risk level thresholds:
+Seuils des niveaux de risque :
 
-| Score      | Level      |
+| Score      | Niveau     |
 |------------|------------|
-| 0 to 30    | `low`      |
-| 31 to 60   | `medium`   |
-| 61 to 80   | `high`     |
-| 81 to 100  | `critical` |
+| 0 à 30     | `low`      |
+| 31 à 60    | `medium`   |
+| 61 à 80    | `high`     |
+| 81 à 100   | `critical` |
 
 ---
 
-## Running the Pipeline
+## Exécution du pipeline
 
 ```bash
-# Activate your environment
+# Activer l'environnement
 conda activate ueba_env
 
-# Full pipeline with all features
+# Pipeline complet avec toutes les fonctionnalités
 python -m src.main ^
   --sample-size 10000 ^
   --include-http ^
@@ -190,9 +188,9 @@ python -m src.main ^
   --send-to-elasticsearch
 ```
 
-On Windows cmd, the `^` symbol allows a command to continue on the next line.
+Sous Windows cmd, le symbole `^` permet de continuer une commande sur la ligne suivante.
 
-You can also run it in one line:
+Version sur une seule ligne :
 
 ```bash
 python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch
@@ -200,15 +198,15 @@ python -m src.main --sample-size 10000 --include-http --include-email --include-
 
 ---
 
-## Saving Trained Models
+## Sauvegarde des modèles entraînés
 
-The pipeline can save trained model artifacts in the `models/` directory.
+Le pipeline peut sauvegarder les artefacts des modèles entraînés dans le dossier `models/`.
 
 ```bash
 python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --save-models
 ```
 
-This generates:
+Cette commande génère :
 
 ```
 models/isolation_forest_model.pkl
@@ -218,42 +216,42 @@ models/autoencoder_scaler.pkl
 models/model_metadata.json
 ```
 
-The metadata file contains information about:
+Le fichier de métadonnées contient les informations suivantes :
 
-- sample size;
-- enabled features;
-- output shapes;
-- risk-level distribution;
-- Isolation Forest contamination;
-- Autoencoder parameters;
-- saved model paths.
-
----
-
-## Command-Line Options
-
-| Flag                      | Description                                          |
-|---------------------------|------------------------------------------------------|
-| `--sample-size N`         | Number of rows per raw log file to process           |
-| `--include-http`          | Include HTTP log features                            |
-| `--include-email`         | Include email log features                           |
-| `--include-ldap`          | Enable LDAP context enrichment                       |
-| `--use-autoencoder`       | Apply TensorFlow Autoencoder anomaly detection       |
-| `--send-to-elasticsearch` | Push generated alerts to Elasticsearch               |
-| `--save-models`           | Save trained models and scalers in `models/`         |
+- taille de l'échantillon ;
+- fonctionnalités activées ;
+- dimensions des sorties ;
+- distribution des niveaux de risque ;
+- contamination d'Isolation Forest ;
+- paramètres de l'Autoencoder ;
+- chemins des modèles sauvegardés.
 
 ---
 
-## Output Files
+## Options de ligne de commande
 
-The pipeline generates two main CSV outputs:
+| Option                    | Description                                                   |
+|---------------------------|---------------------------------------------------------------|
+| `--sample-size N`         | Nombre de lignes par fichier de logs à traiter                |
+| `--include-http`          | Inclure les variables issues des logs HTTP                    |
+| `--include-email`         | Inclure les variables issues des logs email                   |
+| `--include-ldap`          | Activer l'enrichissement contextuel LDAP                      |
+| `--use-autoencoder`       | Appliquer la détection d'anomalies par TensorFlow Autoencoder |
+| `--send-to-elasticsearch` | Envoyer les alertes générées vers Elasticsearch               |
+| `--save-models`           | Sauvegarder les modèles et scalers dans `models/`             |
+
+---
+
+## Fichiers de sortie
+
+Le pipeline génère deux fichiers CSV principaux :
 
 ```
-data/processed/ueba_features.csv   →  All analyzed user/day behaviors
-data/alerts/alerts.csv             →  Alerts with risk_score > 0
+data/processed/ueba_features.csv   →  Tous les comportements utilisateur/jour analysés
+data/alerts/alerts.csv             →  Alertes avec risk_score > 0
 ```
 
-If `--save-models` is used, trained model artifacts are saved in:
+Si `--save-models` est utilisé, les artefacts des modèles sont sauvegardés dans :
 
 ```
 models/
@@ -261,29 +259,29 @@ models/
 
 ---
 
-## Elasticsearch and Grafana
+## Elasticsearch et Grafana
 
-Start Elasticsearch and Grafana using Docker Compose:
+Démarrer Elasticsearch et Grafana avec Docker Compose :
 
 ```bash
 docker compose up -d
 ```
 
-Elasticsearch is available locally at:
+Elasticsearch est accessible localement à :
 
 ```
 http://localhost:9200
 ```
 
-Grafana is available at:
+Grafana est accessible à :
 
 ```
 http://localhost:3000
 ```
 
-The pipeline indexes alerts into the `ueba-alerts` index.
+Le pipeline indexe les alertes dans l'index `ueba-alerts`.
 
-You can verify the indexed alerts with:
+Pour vérifier les alertes indexées :
 
 ```bash
 curl http://localhost:9200/ueba-alerts/_count
@@ -291,25 +289,25 @@ curl http://localhost:9200/ueba-alerts/_count
 
 ---
 
-## Grafana Dashboard
+## Dashboard Grafana
 
-The dashboard provides **9 panels** to monitor UEBA alerts.
+Le dashboard propose **9 panels** pour superviser les alertes UEBA.
 
-| Panel                            | Description                                      |
-|----------------------------------|--------------------------------------------------|
-| Total Alerts                     | Total number of indexed alerts                   |
-| Critical Alerts                  | Alerts classified as critical                    |
-| Alerts by Risk Level             | Distribution of alerts by risk level             |
-| Top Risky Users                  | Users generating the most alerts                 |
-| Recent Alerts                    | Detailed alert table sorted by risk score        |
-| Alerts by Department             | Alerts grouped by LDAP department                |
-| Top Supervisors by Alerts        | Alerts grouped by supervisor                     |
-| TensorFlow Autoencoder Anomalies | Anomalies detected by the Autoencoder            |
-| Alerts with Email Activity       | Alerts containing email activity                 |
+| Panel                            | Description                                           |
+|----------------------------------|-------------------------------------------------------|
+| Total Alerts                     | Nombre total d'alertes indexées                       |
+| Critical Alerts                  | Alertes classifiées comme critiques                   |
+| Alerts by Risk Level             | Distribution des alertes par niveau de risque         |
+| Top Risky Users                  | Utilisateurs générant le plus d'alertes               |
+| Recent Alerts                    | Table détaillée des alertes triées par score de risque|
+| Alerts by Department             | Alertes regroupées par département LDAP               |
+| Top Supervisors by Alerts        | Alertes regroupées par superviseur                    |
+| TensorFlow Autoencoder Anomalies | Anomalies détectées par l'Autoencoder                 |
+| Alerts with Email Activity       | Alertes contenant une activité email                  |
 
-![UEBA Grafana Dashboard](reports/figures/Dashboard.png)
+![Dashboard Grafana UEBA](reports/figures/Dashboard.png)
 
-The dashboard is exported as:
+Le dashboard est exporté dans :
 
 ```
 dashboards/grafana_dashboard.json
@@ -317,70 +315,70 @@ dashboards/grafana_dashboard.json
 
 ---
 
-## Results — Sample Run
+## Résultats — Exemple d'exécution
 
-Sample run with:
+Exécution avec :
 
 ```bash
 python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch
 ```
 
-| Metric                           | Value  |
-|----------------------------------|-------:|
-| Behaviors analyzed (user/day)    |  4,816 |
-| Total alerts generated           |  1,704 |
-| Critical alerts                  |     93 |
-| Alerts with email activity       |    366 |
-| TensorFlow Autoencoder anomalies |     97 |
-| Final feature columns            |     50 |
+| Métrique                                    | Valeur |
+|---------------------------------------------|-------:|
+| Comportements analysés (utilisateur/jour)   |  4 816 |
+| Alertes générées                            |  1 704 |
+| Alertes critiques                           |     93 |
+| Alertes avec activité email                 |    366 |
+| Anomalies TensorFlow Autoencoder            |     97 |
+| Colonnes de variables finales               |     50 |
 
-Risk-level distribution:
+Distribution par niveau de risque :
 
-| Level      | Count  |
+| Niveau     | Nombre |
 |------------|-------:|
-| `low`      |  4,388 |
+| `low`      |  4 388 |
 | `medium`   |    307 |
 | `high`     |     28 |
 | `critical` |     93 |
 
 ---
 
-## Analytical Notebook
+## Notebook d'analyse
 
-An additional Jupyter notebook was added to support the analytical report:
+Un notebook Jupyter a été ajouté en complément du rapport analytique :
 
 ```text
 notebooks/01_ueba_results_analysis.ipynb
 ```
 
-This notebook analyzes the generated UEBA outputs:
+Ce notebook analyse les sorties générées par le pipeline UEBA :
 
 ```text
 data/processed/ueba_features.csv
 data/alerts/alerts.csv
 ```
 
-It provides several complementary analysis formats:
+Il fournit plusieurs formats d'analyse complémentaires :
 
-- data previews;
-- global statistics tables;
-- descriptive statistics on risk scores;
-- risk level distribution;
-- top risky users;
-- Isolation Forest anomaly analysis;
-- TensorFlow Autoencoder anomaly analysis;
-- alerts by LDAP department;
-- alerts by supervisor;
-- email and HTTP activity analysis;
-- high-risk alert samples.
+- aperçu des données ;
+- tableaux de statistiques globales ;
+- statistiques descriptives sur les scores de risque ;
+- distribution des niveaux de risque ;
+- utilisateurs les plus risqués ;
+- analyse des anomalies Isolation Forest ;
+- analyse des anomalies TensorFlow Autoencoder ;
+- alertes par département LDAP ;
+- alertes par superviseur ;
+- analyse des activités email et HTTP ;
+- échantillons des alertes les plus critiques.
 
-The notebook also generates figures saved under:
+Les figures générées sont sauvegardées dans :
 
 ```text
 reports/figures/
 ```
 
-Generated figures include:
+Figures générées :
 
 ```text
 risk_level_distribution.png
@@ -391,9 +389,9 @@ alerts_by_supervisor.png
 alerts_email_http_activity.png
 ```
 
-These figures are used to enrich the analytical report and provide static visual evidence in addition to the Grafana dashboard.
+Ces figures enrichissent le rapport analytique et constituent des preuves visuelles statiques en complément du dashboard Grafana.
 
-The notebook also exports statistical tables as `.csv` files under:
+Le notebook exporte également des tableaux statistiques au format `.csv` dans :
 
 ```text
 reports/tables/
@@ -401,27 +399,27 @@ reports/tables/
 
 ---
 
-## Trained Model Artifacts
+## Artefacts des modèles entraînés
 
-The trained models currently versioned in the project are:
+Les modèles entraînés actuellement versionnés dans le projet sont :
 
-| File                               | Description                              |
-|------------------------------------|------------------------------------------|
-| `models/isolation_forest_model.pkl`  | Trained Isolation Forest model           |
-| `models/isolation_forest_scaler.pkl` | Scaler used before Isolation Forest      |
-| `models/autoencoder_model.keras`     | Trained TensorFlow Autoencoder           |
-| `models/autoencoder_scaler.pkl`      | Scaler used before Autoencoder           |
-| `models/model_metadata.json`         | Metadata describing the saved training run |
+| Fichier                              | Description                                        |
+|--------------------------------------|----------------------------------------------------|
+| `models/isolation_forest_model.pkl`  | Modèle Isolation Forest entraîné                   |
+| `models/isolation_forest_scaler.pkl` | Scaler utilisé avant Isolation Forest              |
+| `models/autoencoder_model.keras`     | TensorFlow Autoencoder entraîné                    |
+| `models/autoencoder_scaler.pkl`      | Scaler utilisé avant l'Autoencoder                 |
+| `models/model_metadata.json`         | Métadonnées décrivant l'exécution d'entraînement   |
 
-These artifacts allow the project to keep a reproducible trained-model snapshot.
+Ces artefacts permettent de conserver un snapshot reproductible des modèles entraînés.
 
 ---
 
-## Final Demonstration Run
+## Démonstration finale
 
-The following results were obtained during the final complete pipeline execution, with all features enabled including model saving and Elasticsearch indexing.
+Les résultats suivants ont été obtenus lors de l'exécution finale complète du pipeline, avec toutes les fonctionnalités activées, y compris la sauvegarde des modèles et l'indexation Elasticsearch.
 
-**Command used:**
+**Commande utilisée :**
 
 ```bash
 python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch --save-models
@@ -429,7 +427,7 @@ python -m src.main --sample-size 10000 --include-http --include-email --include-
 
 ### Infrastructure
 
-Both Docker containers started successfully before the run:
+Les deux containers Docker ont démarré avec succès avant l'exécution :
 
 ```
 [+] up 2/2
@@ -437,9 +435,9 @@ Both Docker containers started successfully before the run:
 ✔ Container ueba_grafana         Running
 ```
 
-### Pipeline execution
+### Exécution du pipeline
 
-The pipeline ran all stages in sequence:
+Le pipeline a exécuté toutes les étapes en séquence :
 
 ```
 Loading samples...
@@ -461,27 +459,27 @@ Saving trained models...
 Sending alerts to Elasticsearch...
 ```
 
-### TensorFlow Autoencoder — anomaly distribution
+### TensorFlow Autoencoder — distribution des anomalies
 
-| `autoencoder_is_anomaly` | Count |
-|--------------------------|------:|
-| 0 — Normal               | 4,719 |
-| 1 — Anomaly              |    97 |
+| `autoencoder_is_anomaly` | Nombre |
+|--------------------------|-------:|
+| 0 — Normal               |  4 719 |
+| 1 — Anomalie             |     97 |
 
-### TensorFlow Autoencoder — reconstruction error statistics
+### TensorFlow Autoencoder — statistiques de l'erreur de reconstruction
 
-| Statistic | Value     |
-|-----------|----------:|
-| count     | 4,816     |
-| mean      | 0.086806  |
-| std       | 0.224090  |
-| min       | 0.004234  |
-| 25%       | 0.004234  |
-| 50%       | 0.029388  |
-| 75%       | 0.072206  |
-| max       | 4.271340  |
+| Statistique | Valeur    |
+|-------------|----------:|
+| count       | 4 816     |
+| mean        | 0.086806  |
+| std         | 0.224090  |
+| min         | 0.004234  |
+| 25%         | 0.004234  |
+| 50%         | 0.029388  |
+| 75%         | 0.072206  |
+| max         | 4.271340  |
 
-### Trained models saved
+### Modèles sauvegardés
 
 ```
 models/isolation_forest_model.pkl    ✔
@@ -491,71 +489,71 @@ models/autoencoder_scaler.pkl        ✔
 models/model_metadata.json           ✔
 ```
 
-### Elasticsearch indexing
+### Indexation Elasticsearch
 
 ```
-Connected to Elasticsearch 8.13.4 on cluster 'docker-cluster'.
-Successfully indexed 1706 alerts into 'ueba-alerts'.
+Connecté à Elasticsearch 8.13.4 sur le cluster 'docker-cluster'.
+1706 alertes indexées avec succès dans 'ueba-alerts'.
 ```
 
-### Final output shapes
+### Dimensions des fichiers de sortie
 
-| Output                | Shape      |
+| Fichier               | Dimensions |
 |-----------------------|------------|
 | `ueba_features.csv`   | 4816 × 50  |
 | `alerts.csv`          | 1706 × 50  |
 
-### Final risk-level distribution
+### Distribution finale des niveaux de risque
 
-| Level      | Count |
-|------------|------:|
-| `low`      | 4,386 |
-| `medium`   |   308 |
-| `critical` |    87 |
-| `high`     |    35 |
+| Niveau     | Nombre |
+|------------|-------:|
+| `low`      |  4 386 |
+| `medium`   |    308 |
+| `critical` |     87 |
+| `high`     |     35 |
 
-### Sample top critical alerts (risk_score = 100)
+### Échantillon des alertes critiques (risk_score = 100)
 
-| User    | Day        | Risk Score | Risk Level | Department       | Supervisor             |
-|---------|------------|:----------:|------------|------------------|------------------------|
-| KSP0357 | 2010-01-04 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
-| GTD0219 | 2010-01-07 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
-| WMB0022 | 2010-01-06 | 100        | critical   | 1 – Research     | Lillith Adena Matthews |
-| GTD0219 | 2010-01-04 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
-| JTM0223 | 2010-01-04 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
-| AJF0370 | 2010-01-12 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
-| AJF0370 | 2010-01-11 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
-| MOS0047 | 2010-01-07 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
-| MOS0047 | 2010-01-05 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
-| CBB0365 | 2010-01-04 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
+| Utilisateur | Date       | Score | Niveau   | Département      | Superviseur             |
+|-------------|------------|:-----:|----------|------------------|-------------------------|
+| KSP0357     | 2010-01-04 | 100   | critical | 6 – Security     | Francis Brian Armstrong |
+| GTD0219     | 2010-01-07 | 100   | critical | 6 – Security     | Frances Alisa Wiggins   |
+| WMB0022     | 2010-01-06 | 100   | critical | 1 – Research     | Lillith Adena Matthews  |
+| GTD0219     | 2010-01-04 | 100   | critical | 6 – Security     | Frances Alisa Wiggins   |
+| JTM0223     | 2010-01-04 | 100   | critical | 6 – Security     | Frances Alisa Wiggins   |
+| AJF0370     | 2010-01-12 | 100   | critical | 6 – Security     | Francis Brian Armstrong |
+| AJF0370     | 2010-01-11 | 100   | critical | 6 – Security     | Francis Brian Armstrong |
+| MOS0047     | 2010-01-07 | 100   | critical | 6 – Security     | Frances Alisa Wiggins   |
+| MOS0047     | 2010-01-05 | 100   | critical | 6 – Security     | Frances Alisa Wiggins   |
+| CBB0365     | 2010-01-04 | 100   | critical | 6 – Security     | Francis Brian Armstrong |
 
-The top alerts are concentrated in the **Security department**, with alert reasons combining logon activity outside working hours, USB activity, and multiple behavioral signals triggering the maximum risk score.
+Les alertes les plus critiques sont concentrées dans le **département Sécurité**, avec des raisons d'alerte combinant activité de connexion hors horaires, usage USB et plusieurs signaux comportementaux déclenchant le score de risque maximal.
 
-### Screenshots
+### Captures d'écran
 
-**Demo 1 — Pipeline execution and Autoencoder output**
+**Démo 1 — Exécution du pipeline et sortie de l'Autoencoder**
 
-![Final Demonstration — Part 1](Demonstration_Finale/Demo_1.png)
+![Démonstration finale — Partie 1](Demonstration_Finale/Demo_1.png)
 
-**Demo 2 — Risk analysis, model saving, Elasticsearch indexing and top critical alerts**
+**Démo 2 — Analyse de risque, sauvegarde des modèles, indexation Elasticsearch et alertes critiques**
 
-![Final Demonstration — Part 2](Demonstration_Finale/Demo_2.png)
+![Démonstration finale — Partie 2](Demonstration_Finale/Demo_2.png)
 
 ---
 
-## Status
+## Statut du projet
 
-- [x] Pipeline functional for logon, device, file, HTTP, and email features
-- [x] Isolation Forest integrated
-- [x] TensorFlow Autoencoder integrated
-- [x] LDAP context enrichment added
-- [x] Elasticsearch indexing connected
-- [x] Grafana dashboard created and exported
-- [x] Dashboard screenshot added to the analytical report
-- [x] Trained model artifacts saved in `models/`
-- [x] Analytical notebook added with figures and statistical tables
-- [x] Final demonstration run completed and documented
-- [x] Project versioned on GitHub step by step
+- [x] Pipeline fonctionnel pour logon, device, file, HTTP et email
+- [x] Isolation Forest intégré
+- [x] TensorFlow Autoencoder intégré
+- [x] Enrichissement contextuel LDAP ajouté
+- [x] Indexation Elasticsearch connectée
+- [x] Dashboard Grafana créé et exporté
+- [x] Capture du dashboard ajoutée au rapport analytique
+- [x] Artefacts des modèles entraînés sauvegardés dans `models/`
+- [x] Notebook d'analyse ajouté avec figures et tableaux statistiques
+- [x] Exécution finale de démonstration complétée et documentée
+- [x] Projet versionné sur GitHub étape par étape
 
 ---
 
