@@ -1,0 +1,9 @@
+Metric,Value
+total_behaviors,4816.0
+total_alerts,1708.0
+alert_rate_percent,35.47
+critical_alerts,89.0
+isolation_forest_anomalies,97.0
+autoencoder_anomalies,97.0
+alerts_with_email_activity,370.0
+alerts_with_http_activity,115.0
