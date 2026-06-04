@@ -9,16 +9,20 @@ This project implements a full UEBA pipeline, from raw log ingestion to alert vi
 
 ## Project Structure
 
-```
 ueba-project/
 │
 ├── data/
-│   ├── raw/                        # Raw CERT logs : logon, device, file, http, email, LDAP
+│   ├── raw/                        # Raw CERT logs: logon, device, file, http, email, LDAP
 │   ├── processed/                  # Processed UEBA features
 │   └── alerts/                     # Generated UEBA alerts
 │
+├── Demonstration_Finale/
+│   ├── Demo_1.png                  # Final execution screenshot: full pipeline and model saving
+│   └── Demo_2.png                  # Final execution screenshot: Docker, Elasticsearch and command output
+│
 ├── dashboards/
-│   └── grafana_dashboard.json      # Exported Grafana dashboard
+│   ├── grafana_dashboard.json      # Exported Grafana dashboard
+│   └── grafana_dashboard_notes.md  # Dashboard documentation
 │
 ├── models/
 │   ├── isolation_forest_model.pkl  # Trained Isolation Forest model
@@ -28,42 +32,30 @@ ueba-project/
 │   └── model_metadata.json         # Metadata about the saved models
 │
 ├── notebooks/
-│   └── 01_ueba_results_analysis.ipynb  # Statistical analysis notebook
+│   └── 01_ueba_results_analysis.ipynb
 │
 ├── reports/
-│   ├── rapport_analytique.md       # Project analytical report
-│   ├── figures/
-│   │   ├── Dashboard.png                    # Grafana dashboard screenshot
-│   │   ├── risk_level_distribution.png      # Risk level distribution chart
-│   │   ├── top_risky_users.png              # Top risky users chart
-│   │   ├── autoencoder_anomalies.png        # Autoencoder anomaly detection chart
-│   │   ├── alerts_by_department.png         # Alerts by LDAP department chart
-│   │   ├── alerts_by_supervisor.png         # Alerts by supervisor chart
-│   │   └── alerts_email_http_activity.png   # Email and HTTP activity chart
-│   └── tables/
-│       ├── global_stats.csv                 # General pipeline summary
-│       ├── risk_level_distribution.csv      # Risk level counts and percentages
-│       ├── top_risky_users.csv              # Top users by alert count
-│       ├── isolation_forest_summary.csv     # Isolation Forest anomaly summary
-│       ├── autoencoder_summary.csv          # Autoencoder anomaly summary
-│       ├── alerts_by_department.csv         # Alerts grouped by department
-│       ├── alerts_by_supervisor.csv         # Alerts grouped by supervisor
-│       ├── email_http_activity.csv          # Email and HTTP activity breakdown
-│       └── final_summary.csv               # Final report summary table
+│   ├── figures/                    # Figures generated for the analytical report
+│   ├── tables/                     # Optional statistical tables
+│   └── rapport_analytique.md       # Project analytical report
 │
 ├── src/
-│   ├── config.py                   # Central configuration and paths
-│   ├── load_data.py                # Secure CSV file loading
-│   ├── preprocessing.py            # Date parsing and temporal features
-│   ├── feature_engineering.py      # Logon, device, file, HTTP, email features
-│   ├── rule_engine.py              # Rule-based risk scoring
-│   ├── isolation_forest_model.py   # Isolation Forest anomaly detection
-│   ├── autoencoder_model.py        # TensorFlow Autoencoder anomaly detection
-│   ├── risk_analyzer.py            # Final risk score computation
-│   ├── context_enrichment.py       # LDAP context enrichment
-│   ├── elastic_connector.py        # Elasticsearch indexing
-│   └── main.py                     # Pipeline entry point
+│   ├── config.py
+│   ├── load_data.py
+│   ├── preprocessing.py
+│   ├── feature_engineering.py
+│   ├── rule_engine.py
+│   ├── isolation_forest_model.py
+│   ├── autoencoder_model.py
+│   ├── risk_analyzer.py
+│   ├── context_enrichment.py
+│   ├── elastic_connector.py
+│   └── main.py
 │
+├── docker-compose.yml
+├── environment.yml
+├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
@@ -422,6 +414,132 @@ These artifacts allow the project to keep a reproducible trained-model snapshot.
 
 ---
 
+## Final Demonstration Run
+
+The following results were obtained during the final complete pipeline execution, with all features enabled including model saving and Elasticsearch indexing.
+
+**Command used:**
+
+```bash
+python -m src.main --sample-size 10000 --include-http --include-email --include-ldap --use-autoencoder --send-to-elasticsearch --save-models
+```
+
+### Infrastructure
+
+Both Docker containers started successfully before the run:
+
+```
+[+] up 2/2
+✔ Container ueba_elasticsearch   Running
+✔ Container ueba_grafana         Running
+```
+
+### Pipeline execution
+
+The pipeline ran all stages in sequence:
+
+```
+Loading samples...
+Loading HTTP sample...
+Loading Email sample...
+Preprocessing samples...
+Building behavioral features...
+Building HTTP behavior features...
+Building Email behavior features...
+Applying rule engine...
+Applying Isolation Forest...
+Applying TensorFlow Autoencoder...
+Applying final risk analysis...
+Enriching results with LDAP context...
+Filtering alerts with risk_score > 0...
+Exporting UEBA features...
+Exporting UEBA alerts...
+Saving trained models...
+Sending alerts to Elasticsearch...
+```
+
+### TensorFlow Autoencoder — anomaly distribution
+
+| `autoencoder_is_anomaly` | Count |
+|--------------------------|------:|
+| 0 — Normal               | 4,719 |
+| 1 — Anomaly              |    97 |
+
+### TensorFlow Autoencoder — reconstruction error statistics
+
+| Statistic | Value     |
+|-----------|----------:|
+| count     | 4,816     |
+| mean      | 0.086806  |
+| std       | 0.224090  |
+| min       | 0.004234  |
+| 25%       | 0.004234  |
+| 50%       | 0.029388  |
+| 75%       | 0.072206  |
+| max       | 4.271340  |
+
+### Trained models saved
+
+```
+models/isolation_forest_model.pkl    ✔
+models/isolation_forest_scaler.pkl   ✔
+models/autoencoder_model.keras       ✔
+models/autoencoder_scaler.pkl        ✔
+models/model_metadata.json           ✔
+```
+
+### Elasticsearch indexing
+
+```
+Connected to Elasticsearch 8.13.4 on cluster 'docker-cluster'.
+Successfully indexed 1706 alerts into 'ueba-alerts'.
+```
+
+### Final output shapes
+
+| Output                | Shape      |
+|-----------------------|------------|
+| `ueba_features.csv`   | 4816 × 50  |
+| `alerts.csv`          | 1706 × 50  |
+
+### Final risk-level distribution
+
+| Level      | Count |
+|------------|------:|
+| `low`      | 4,386 |
+| `medium`   |   308 |
+| `critical` |    87 |
+| `high`     |    35 |
+
+### Sample top critical alerts (risk_score = 100)
+
+| User    | Day        | Risk Score | Risk Level | Department       | Supervisor             |
+|---------|------------|:----------:|------------|------------------|------------------------|
+| KSP0357 | 2010-01-04 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
+| GTD0219 | 2010-01-07 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
+| WMB0022 | 2010-01-06 | 100        | critical   | 1 – Research     | Lillith Adena Matthews |
+| GTD0219 | 2010-01-04 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
+| JTM0223 | 2010-01-04 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
+| AJF0370 | 2010-01-12 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
+| AJF0370 | 2010-01-11 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
+| MOS0047 | 2010-01-07 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
+| MOS0047 | 2010-01-05 | 100        | critical   | 6 – Security     | Frances Alisa Wiggins  |
+| CBB0365 | 2010-01-04 | 100        | critical   | 6 – Security     | Francis Brian Armstrong|
+
+The top alerts are concentrated in the **Security department**, with alert reasons combining logon activity outside working hours, USB activity, and multiple behavioral signals triggering the maximum risk score.
+
+### Screenshots
+
+**Demo 1 — Pipeline execution and Autoencoder output**
+
+![Final Demonstration — Part 1](Demonstration_Finale/Demo_1.png)
+
+**Demo 2 — Risk analysis, model saving, Elasticsearch indexing and top critical alerts**
+
+![Final Demonstration — Part 2](Demonstration_Finale/Demo_2.png)
+
+---
+
 ## Status
 
 - [x] Pipeline functional for logon, device, file, HTTP, and email features
@@ -433,6 +551,7 @@ These artifacts allow the project to keep a reproducible trained-model snapshot.
 - [x] Dashboard screenshot added to the analytical report
 - [x] Trained model artifacts saved in `models/`
 - [x] Analytical notebook added with figures and statistical tables
+- [x] Final demonstration run completed and documented
 - [x] Project versioned on GitHub step by step
 
 ---
