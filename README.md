@@ -9,54 +9,57 @@ This project implements a full UEBA pipeline, from raw log ingestion to alert vi
 
 ## Project Structure
 
+## Project Structure
+
+```text
 ueba-project/
 │
 ├── data/
-│   ├── raw/                        # Raw CERT logs: logon, device, file, http, email, LDAP
-│   ├── processed/                  # Processed UEBA features
-│   └── alerts/                     # Generated UEBA alerts
+│   ├── raw/                         # Raw CERT logs: logon, device, file, http, email, LDAP
+│   ├── processed/                   # Processed UEBA features
+│   └── alerts/                      # Generated UEBA alerts
 │
 ├── Demonstration_Finale/
-│   ├── Demo_1.png                  # Final execution screenshot: full pipeline and model saving
-│   └── Demo_2.png                  # Final execution screenshot: Docker, Elasticsearch and command output
+│   ├── Demo_1.png                   # Final execution screenshot: full pipeline and model saving
+│   └── Demo_2.png                   # Final execution screenshot: Docker, Elasticsearch and command output
 │
 ├── dashboards/
-│   ├── grafana_dashboard.json      # Exported Grafana dashboard
-│   └── grafana_dashboard_notes.md  # Dashboard documentation
+│   ├── grafana_dashboard.json       # Exported Grafana dashboard
+│   └── grafana_dashboard_notes.md   # Dashboard documentation
 │
 ├── models/
-│   ├── isolation_forest_model.pkl  # Trained Isolation Forest model
-│   ├── isolation_forest_scaler.pkl # Scaler used for Isolation Forest
-│   ├── autoencoder_model.keras     # Trained TensorFlow Autoencoder model
-│   ├── autoencoder_scaler.pkl      # Scaler used for Autoencoder
-│   └── model_metadata.json         # Metadata about the saved models
+│   ├── isolation_forest_model.pkl   # Trained Isolation Forest model
+│   ├── isolation_forest_scaler.pkl  # Scaler used for Isolation Forest
+│   ├── autoencoder_model.keras      # Trained TensorFlow Autoencoder model
+│   ├── autoencoder_scaler.pkl       # Scaler used for Autoencoder
+│   └── model_metadata.json          # Metadata about the saved models
 │
 ├── notebooks/
 │   └── 01_ueba_results_analysis.ipynb
 │
 ├── reports/
-│   ├── figures/                    # Figures generated for the analytical report
-│   ├── tables/                     # Optional statistical tables
-│   └── rapport_analytique.md       # Project analytical report
+│   ├── figures/                     # Figures generated for the analytical report
+│   ├── tables/                      # Optional statistical tables
+│   └── rapport_analytique.md        # Project analytical report
 │
 ├── src/
-│   ├── config.py
-│   ├── load_data.py
-│   ├── preprocessing.py
-│   ├── feature_engineering.py
-│   ├── rule_engine.py
-│   ├── isolation_forest_model.py
-│   ├── autoencoder_model.py
-│   ├── risk_analyzer.py
-│   ├── context_enrichment.py
-│   ├── elastic_connector.py
-│   └── main.py
+│   ├── config.py                    # Central configuration and paths
+│   ├── load_data.py                 # Secure CSV file loading
+│   ├── preprocessing.py             # Date parsing and temporal features
+│   ├── feature_engineering.py       # Behavioral feature engineering
+│   ├── rule_engine.py               # Rule-based risk scoring
+│   ├── isolation_forest_model.py    # Isolation Forest anomaly detection
+│   ├── autoencoder_model.py         # TensorFlow Autoencoder anomaly detection
+│   ├── risk_analyzer.py             # Final risk score computation
+│   ├── context_enrichment.py        # LDAP context enrichment
+│   ├── elastic_connector.py         # Elasticsearch indexing
+│   └── main.py                      # Pipeline entry point
 │
-├── docker-compose.yml
-├── environment.yml
-├── requirements.txt
-├── .gitignore
-└── README.md
+├── docker-compose.yml               # Elasticsearch and Grafana services
+├── environment.yml                  # Conda environment definition
+├── requirements.txt                 # Python dependencies
+├── .gitignore                       # Git ignored files
+└── README.md                        # Project documentation
 ```
 
 ---
