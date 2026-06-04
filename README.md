@@ -27,10 +27,29 @@ ueba-project/
 │   ├── autoencoder_scaler.pkl      # Scaler used for Autoencoder
 │   └── model_metadata.json         # Metadata about the saved models
 │
+├── notebooks/
+│   └── 01_ueba_results_analysis.ipynb  # Statistical analysis notebook
+│
 ├── reports/
 │   ├── rapport_analytique.md       # Project analytical report
-│   └── figures/
-│       └── Dashboard.png           # Grafana dashboard screenshot
+│   ├── figures/
+│   │   ├── Dashboard.png                    # Grafana dashboard screenshot
+│   │   ├── risk_level_distribution.png      # Risk level distribution chart
+│   │   ├── top_risky_users.png              # Top risky users chart
+│   │   ├── autoencoder_anomalies.png        # Autoencoder anomaly detection chart
+│   │   ├── alerts_by_department.png         # Alerts by LDAP department chart
+│   │   ├── alerts_by_supervisor.png         # Alerts by supervisor chart
+│   │   └── alerts_email_http_activity.png   # Email and HTTP activity chart
+│   └── tables/
+│       ├── global_stats.csv                 # General pipeline summary
+│       ├── risk_level_distribution.csv      # Risk level counts and percentages
+│       ├── top_risky_users.csv              # Top users by alert count
+│       ├── isolation_forest_summary.csv     # Isolation Forest anomaly summary
+│       ├── autoencoder_summary.csv          # Autoencoder anomaly summary
+│       ├── alerts_by_department.csv         # Alerts grouped by department
+│       ├── alerts_by_supervisor.csv         # Alerts grouped by supervisor
+│       ├── email_http_activity.csv          # Email and HTTP activity breakdown
+│       └── final_summary.csv               # Final report summary table
 │
 ├── src/
 │   ├── config.py                   # Central configuration and paths
@@ -331,6 +350,62 @@ Risk-level distribution:
 
 ---
 
+## Analytical Notebook
+
+An additional Jupyter notebook was added to support the analytical report:
+
+```text
+notebooks/01_ueba_results_analysis.ipynb
+```
+
+This notebook analyzes the generated UEBA outputs:
+
+```text
+data/processed/ueba_features.csv
+data/alerts/alerts.csv
+```
+
+It provides several complementary analysis formats:
+
+- data previews;
+- global statistics tables;
+- descriptive statistics on risk scores;
+- risk level distribution;
+- top risky users;
+- Isolation Forest anomaly analysis;
+- TensorFlow Autoencoder anomaly analysis;
+- alerts by LDAP department;
+- alerts by supervisor;
+- email and HTTP activity analysis;
+- high-risk alert samples.
+
+The notebook also generates figures saved under:
+
+```text
+reports/figures/
+```
+
+Generated figures include:
+
+```text
+risk_level_distribution.png
+top_risky_users.png
+autoencoder_anomalies.png
+alerts_by_department.png
+alerts_by_supervisor.png
+alerts_email_http_activity.png
+```
+
+These figures are used to enrich the analytical report and provide static visual evidence in addition to the Grafana dashboard.
+
+The notebook also exports statistical tables as `.csv` files under:
+
+```text
+reports/tables/
+```
+
+---
+
 ## Trained Model Artifacts
 
 The trained models currently versioned in the project are:
@@ -357,6 +432,7 @@ These artifacts allow the project to keep a reproducible trained-model snapshot.
 - [x] Grafana dashboard created and exported
 - [x] Dashboard screenshot added to the analytical report
 - [x] Trained model artifacts saved in `models/`
+- [x] Analytical notebook added with figures and statistical tables
 - [x] Project versioned on GitHub step by step
 
 ---

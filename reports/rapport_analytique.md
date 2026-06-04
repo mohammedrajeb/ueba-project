@@ -351,6 +351,76 @@ Distribution finale des niveaux de risque :
 | `high`       |      28 |
 | `critical`   |      93 |
 
+### 12.4 Analyse statistique complémentaire via notebook
+
+En complément du pipeline principal, un notebook Jupyter a été ajouté afin de réaliser une analyse statistique plus détaillée des résultats générés par la plateforme UEBA.
+
+Le notebook est disponible dans :
+
+```text
+notebooks/01_ueba_results_analysis.ipynb
+```
+
+Il exploite les deux fichiers générés par le pipeline :
+
+```
+data/processed/ueba_features.csv
+data/alerts/alerts.csv
+```
+
+L'objectif de ce notebook est de compléter l'analyse technique par une lecture statistique des résultats. Contrairement au dashboard Grafana, qui sert principalement à la supervision visuelle et interactive, le notebook permet de produire des tableaux de synthèse, des statistiques descriptives et des graphiques réutilisables dans le rapport analytique.
+
+Le notebook permet notamment d'analyser :
+
+- la distribution des niveaux de risque ;
+- les utilisateurs générant le plus d'alertes ;
+- les anomalies détectées par le modèle TensorFlow Autoencoder ;
+- la répartition des alertes par département ;
+- la répartition des alertes par superviseur ;
+- la présence d'activité email ou HTTP dans les alertes.
+
+Les figures générées sont stockées dans le dossier :
+
+```
+reports/figures/
+```
+
+#### Distribution des niveaux de risque
+
+Ce diagramme présente la répartition des comportements analysés selon leur niveau de risque final : `low`, `medium`, `high` et `critical`. Il permet de vérifier la cohérence globale du système UEBA. Dans une approche de détection comportementale, il est attendu que la majorité des observations soient classées comme faibles ou modérées, car la plupart des comportements utilisateurs restent ordinaires. Les niveaux `high` et `critical` représentent une proportion plus réduite, mais ils constituent les cas prioritaires pour l'analyse. Cette distribution montre donc que le moteur ne classe pas massivement les comportements comme critiques, ce qui limite le risque de surcharge d'alertes pour un analyste SOC.
+
+![Distribution des niveaux de risque](figures/risk_level_distribution.png)
+
+#### Utilisateurs générant le plus d'alertes
+
+Ce diagramme met en évidence les utilisateurs ayant généré le plus grand nombre d'alertes. Il permet d'identifier rapidement les profils qui présentent une récurrence de comportements suspects sur la période étudiée. Un volume élevé d'alertes ne signifie pas nécessairement qu'un utilisateur est malveillant, mais il constitue un signal de priorisation. Dans un contexte opérationnel, ces utilisateurs pourraient faire l'objet d'une investigation plus approfondie afin de comprendre si les alertes sont liées à un rôle spécifique, à une activité professionnelle légitime ou à un comportement réellement anormal.
+
+![Utilisateurs générant le plus d'alertes](figures/top_risky_users.png)
+
+#### Anomalies détectées par TensorFlow Autoencoder
+
+Ce diagramme présente la répartition des comportements détectés comme normaux ou anormaux par le modèle TensorFlow Autoencoder. L'Autoencoder repose sur le principe de l'erreur de reconstruction : lorsqu'un comportement est difficile à reconstruire par le modèle, il est considéré comme plus éloigné des comportements habituels. Le graphique permet donc de visualiser la part d'anomalies identifiées par cette couche IA avancée. Dans le projet, cette information complète la détection par Isolation Forest et le moteur de règles, en ajoutant une perspective basée sur l'apprentissage profond.
+
+![Anomalies détectées par TensorFlow Autoencoder](figures/autoencoder_anomalies.png)
+
+#### Alertes par département
+
+Ce diagramme exploite l'enrichissement LDAP pour regrouper les alertes par département. Il apporte une lecture organisationnelle des résultats, en montrant les départements dans lesquels les alertes sont les plus fréquentes. Cette information doit être interprétée avec prudence : un département avec un volume élevé d'alertes n'est pas nécessairement plus risqué, car le nombre d'alertes peut dépendre de la nature des missions, du volume d'activité ou du nombre d'utilisateurs observés. Néanmoins, ce type d'analyse permet d'orienter les investigations et d'identifier les zones organisationnelles qui méritent une attention particulière.
+
+![Alertes par département](figures/alerts_by_department.png)
+
+#### Alertes par superviseur
+
+Ce diagramme agrège les alertes selon le superviseur direct des utilisateurs, grâce aux données LDAP. Il permet d'observer si certaines alertes sont concentrées autour d'équipes ou de lignes managériales spécifiques. Cette vue est particulièrement utile dans une logique d'investigation, car elle permet de contextualiser les alertes au-delà de l'identifiant utilisateur. Elle peut également aider à comprendre si certains comportements sont liés à des pratiques d'équipe, à des contraintes métier ou à des usages spécifiques dans une unité opérationnelle.
+
+![Alertes par superviseur](figures/alerts_by_supervisor.png)
+
+#### Alertes avec activité email ou HTTP
+
+Ce diagramme compare le nombre d'alertes contenant une activité email et le nombre d'alertes contenant une activité HTTP. Il permet d'évaluer la contribution des nouvelles sources de données intégrées au pipeline. L'activité email peut être associée à des scénarios de fuite d'information, d'envoi de pièces jointes ou d'usage inhabituel des destinataires. L'activité HTTP peut quant à elle révéler une navigation inhabituelle, un accès à de nombreux domaines ou une activité web hors horaires. Ce graphique montre donc l'intérêt d'avoir enrichi le pipeline initial avec `email.csv` et `http.csv`.
+
+![Alertes avec activité email ou HTTP](figures/alerts_email_http_activity.png)
+
 ---
 
 ## 13. Export et indexation Elasticsearch
@@ -404,9 +474,59 @@ Le dashboard a été exporté dans :
 dashboards/grafana_dashboard.json
 ```
 
+### Figures complémentaires issues du notebook
+
+En complément du dashboard Grafana, plusieurs figures statistiques ont été générées à partir du notebook d'analyse. Ces figures permettent de documenter les résultats du pipeline sous une forme réutilisable dans le rapport.
+
+Les figures générées sont :
+
+```
+reports/figures/risk_level_distribution.png
+reports/figures/top_risky_users.png
+reports/figures/autoencoder_anomalies.png
+reports/figures/alerts_by_department.png
+reports/figures/alerts_by_supervisor.png
+reports/figures/alerts_email_http_activity.png
+```
+
+Ces visualisations ne remplacent pas Grafana, mais elles permettent de conserver des captures analytiques stables dans le rapport. Elles sont particulièrement utiles pour présenter les résultats dans un contexte académique ou lors d'une soutenance.
+
 ---
 
-## 15. Limites du projet
+## 15. Visualisation sous forme de tableaux
+
+En plus des représentations graphiques, les résultats du projet sont également disponibles sous forme de tableaux statistiques exportés au format `.csv`. Ces fichiers permettent de conserver des valeurs précises, de comparer les résultats et de faciliter l'intégration dans un rapport écrit.
+
+Les tableaux sont générés depuis le notebook et exportés dans le dossier :
+
+```
+reports/tables/
+```
+
+Les fichiers actuellement disponibles dans ce dossier sont :
+
+| Fichier CSV                        | Description                                                                        |
+|------------------------------------|------------------------------------------------------------------------------------|
+| `global_stats.csv`                 | Synthèse générale du nombre de comportements analysés, d'alertes et d'utilisateurs |
+| `risk_level_distribution.csv`      | Distribution des niveaux de risque avec effectifs et pourcentages                  |
+| `top_risky_users.csv`              | Classement des utilisateurs générant le plus d'alertes                             |
+| `isolation_forest_summary.csv`     | Synthèse des anomalies détectées par Isolation Forest                              |
+| `autoencoder_summary.csv`          | Synthèse des anomalies détectées par TensorFlow Autoencoder                        |
+| `alerts_by_department.csv`         | Répartition des alertes par département LDAP                                       |
+| `alerts_by_supervisor.csv`         | Répartition des alertes par superviseur                                            |
+| `email_http_activity.csv`          | Comparaison des alertes contenant une activité email ou HTTP                       |
+| `final_summary.csv`                | Tableau final de synthèse pour le rapport                                          |
+
+Il est donc possible de visualiser les résultats de deux manières complémentaires :
+
+- sous forme de **diagrammes** dans `reports/figures/`, pour faciliter la visualisation et l'interprétation rapide ;
+- sous forme de **tableaux CSV** dans `reports/tables/`, pour conserver des valeurs exactes et permettre une analyse plus détaillée.
+
+Ces fichiers peuvent être ouverts directement dans un tableur, réutilisés dans une annexe technique ou intégrés dans une présentation de soutenance.
+
+---
+
+## 16. Limites du projet
 
 | Limite                              | Description                                                                                                                  |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
@@ -419,7 +539,7 @@ dashboards/grafana_dashboard.json
 
 ---
 
-## 16. Améliorations futures
+## 17. Améliorations futures
 
 - [ ] Intégrer une gestion par chunks pour traiter de très gros fichiers
 - [ ] Ajouter des tests unitaires sur les modules Python
@@ -433,7 +553,7 @@ dashboards/grafana_dashboard.json
 
 ---
 
-## 17. Conclusion
+## 18. Conclusion
 
 Ce projet a permis de construire une plateforme UEBA complète et fonctionnelle.
 
