@@ -538,22 +538,7 @@ Ces fichiers peuvent être ouverts directement dans un tableur, réutilisés dan
 | Volume de `http.csv`                | Ce fichier est très volumineux et nécessite une lecture par échantillon                                                      |
 
 ---
-
-## 17. Améliorations futures
-
-- [ ] Intégrer une gestion par chunks pour traiter de très gros fichiers
-- [ ] Ajouter des tests unitaires sur les modules Python
-- [ ] Ajouter une analyse temporelle plus avancée
-- [ ] Comparer quantitativement Isolation Forest et Autoencoder
-- [ ] Ajouter une page détaillée par utilisateur dans Grafana
-- [ ] Enrichir la table des alertes avec davantage de champs LDAP
-- [ ] Améliorer la pondération du score de risque
-- [ ] Ajouter une documentation d'installation plus détaillée
-- [ ] Prévoir un déploiement plus proche d'un environnement SOC
-
----
-
-## 18. Conclusion
+## 17. Conclusion
 
 Ce projet a permis de construire une plateforme UEBA complète et fonctionnelle.
 
